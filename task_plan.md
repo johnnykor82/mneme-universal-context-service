@@ -39,9 +39,10 @@ Phase 10 MCP server and adapter substrate is complete.
   preview-hook rehearsal, and MCP recall now pass. Do not claim automatic Codex
   prompt insertion: current documented Codex command hooks can prepare/write
   preview files, but no context-build prompt replacement hook is documented.
-  Phase 14C full original-core parity completion is complete. Next, Mneme plus
-  the Codex adapter should be published to the user's GitHub and installed on
-  the second Codex machine as a new-user setup.
+  Phase 14C full original-core parity completion is complete. Mneme plus the
+  Codex adapter is published at
+  `https://github.com/johnnykor82/mneme-universal-context-service`; next it
+  should be installed on the second Codex machine as a new-user setup.
 - Support the user's two-machine Codex workflow: shared symlinked files may
   propagate docs/skills/config examples, but Mneme runtime installation, daemon,
   MCP config, tokens, database paths, and hook trust must be verified per

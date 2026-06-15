@@ -4,8 +4,8 @@
 
 - **Current phase:** Phase 13 - Codex memory dogfood and GitHub publication/second-machine rehearsal.
 - **Current status:** Phase 14C full Hermes-Mneme daemon/core parity completion is complete; publication is no longer blocked by original-core parity. Hermes adapter work remains deferred until upstream native context-engine hooks are accepted.
-- **Next action:** re-authenticate GitHub CLI, push the local initial commit,
-  then rehearse install on the second Codex machine as a new-user setup.
+- **Next action:** rehearse installation on the second Codex machine from the
+  public GitHub repository as a new-user setup.
 - **Active plan:** Phase 13 publication/second-machine rehearsal gate after `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md` completion.
 - **Primary source files:** `task_plan.md`, `findings.md`, `progress.md`, `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md`, `MILESTONE_4_CODEX_MEMORY_DOGFOOD_AND_PROVIDER_CONFIG_PLAN.md`, `adapters/codex/MNEME_CODEX_MCP_USAGE.md`, `API_MCP_CONTRACT_V0.md`, `MNEME_HOST_ADAPTER_CONTRACT_V0.md`.
 - **Hard constraints:** do not touch live Hermes or live `hermes-mneme`; work only in `_mneme-universal-context-service`.
@@ -89,21 +89,27 @@
   - LLM structured enrichment gate is now closed. Continue to GitHub
     publication and second-machine install rehearsal.
 
-### GitHub Publication Attempt
+### GitHub Publication
 
-- **Status:** blocked on GitHub authentication
+- **Status:** published; second-machine rehearsal pending
 - Actions taken:
   - Sanitized tracked dogfood docs/progress so local bearer-token literals are
     replaced with placeholders.
   - Initialized a local git repository on branch `main`.
   - Verified ignored local/private paths stay out of git: `.local/`, `.venv/`,
     `.codex/hooks.json`, bytecode caches, pytest cache, and egg-info.
-  - Created initial commit `375359f Initial Mneme universal context service`.
-  - Confirmed working tree is clean and no remote is configured yet.
-- Blocker:
-  - `gh auth status` reports account `johnnykor82`, but the stored GitHub token
-    is invalid. Remote repo creation/push cannot proceed until GitHub CLI is
-    re-authenticated or another valid publication credential is provided.
+  - Created initial commit `3abe756 Initial Mneme universal context service`.
+  - Confirmed GitHub CLI authentication works outside sandbox with account
+    `johnnykor82`, SSH git protocol, and `repo` scope.
+  - Created public GitHub repository:
+    `https://github.com/johnnykor82/mneme-universal-context-service`.
+  - Added `origin` as
+    `git@github.com:johnnykor82/mneme-universal-context-service.git`.
+  - Pushed `main` and set it to track `origin/main`.
+  - Verified GitHub reports visibility `PUBLIC` and default branch `main`.
+- Next gate:
+  - Install from GitHub on the user's second Codex machine as a new-user flow
+    and record any missing setup steps.
 
 ## Session: 2026-06-14
 

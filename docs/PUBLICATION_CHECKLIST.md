@@ -36,9 +36,9 @@ This checklist gates public GitHub publication.
 - [x] For multi-machine Codex use, confirm setup docs distinguish shared
   symlinked files from per-machine runtime installation, daemon, MCP, token,
   database, and hook trust steps.
-- [ ] After local hook validation, publish Mneme plus the Codex adapter to the
-  user's GitHub and run a second-machine install rehearsal from GitHub as a
-  new-user flow.
+- [x] After local hook validation, publish Mneme plus the Codex adapter to the
+  user's GitHub.
+- [ ] Run a second-machine install rehearsal from GitHub as a new-user flow.
 
 ## License Gate
 
@@ -63,7 +63,8 @@ payload validation succeeds on this machine.
 
 After local hook validation:
 
-- publish Mneme plus `adapters/codex` to the user's GitHub;
+- publish Mneme plus `adapters/codex` to the user's GitHub:
+  `https://github.com/johnnykor82/mneme-universal-context-service`;
 - install on the second Codex machine from GitHub as if the installer were a
   new user, not by relying on shared symlinked files;
 - verify `mneme serve`, `mneme mcp`, auth token/env, database path, provider
