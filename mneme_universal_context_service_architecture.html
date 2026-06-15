@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mneme Universal Context Service Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #020617;
+      --panel: #0f172a;
+      --muted: #94a3b8;
+      --text: #e2e8f0;
+      --line: #64748b;
+      --cyan: #22d3ee;
+      --emerald: #34d399;
+      --violet: #a78bfa;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --orange: #fb923c;
+      --slate: #94a3b8;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, rgba(34, 211, 238, 0.08), transparent 30%), var(--bg);
+      color: var(--text);
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .container {
+      width: min(1200px, 96vw);
+      margin: 28px auto;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 14px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+    }
+
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      max-width: 820px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--emerald);
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 18px var(--emerald);
+    }
+
+    .toolbar {
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .toolbar-toggle,
+    .toolbar-actions button {
+      background: #111827;
+      color: var(--text);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 11px;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+
+    .toolbar-actions {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 38px;
+      gap: 8px;
+      padding: 8px;
+      background: #020617;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 10px;
+      z-index: 20;
+    }
+
+    .toolbar:hover .toolbar-actions { display: flex; }
+
+    .diagram-frame {
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #020617;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 10px;
+      padding: 14px;
+      min-height: 126px;
+    }
+
+    .card h3 {
+      margin: 0 0 9px;
+      font-size: 13px;
+      color: #f8fafc;
+    }
+
+    .card ul {
+      margin: 0;
+      padding-left: 0;
+      list-style: none;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.55;
+    }
+
+    footer {
+      margin-top: 14px;
+      color: #64748b;
+      font-size: 10px;
+      text-align: right;
+    }
+
+    @media (max-width: 800px) {
+      .cards { grid-template-columns: 1fr; }
+      header { flex-direction: column; }
+      .toolbar-actions { left: 0; right: auto; }
+    }
+
+    @media print {
+      .toolbar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="report-container">
+    <header>
+      <div>
+        <div class="status"><span class="dot"></span>concept architecture</div>
+        <h1>Mneme Universal Context Service</h1>
+        <div class="subtitle">
+          Local-first event memory for long-running tool-using agents. Raw events are preserved, indexed, and assembled into bounded request-only context when an agent needs continuity beyond the model window.
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="toolbar-toggle" type="button">...</button>
+        <div class="toolbar-actions">
+          <button onclick="copyAsImage()" type="button">Copy</button>
+          <button onclick="downloadPNG()" type="button">PNG</button>
+          <button onclick="downloadPDF()" type="button">PDF</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="diagram-frame">
+      <svg viewBox="0 0 1120 720" role="img" aria-label="Mneme Universal Context Service architecture diagram">
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrowheadCyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrowheadRose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+        </defs>
+
+        <rect width="1120" height="720" fill="#020617"/>
+        <rect width="1120" height="720" fill="url(#grid)"/>
+
+        <!-- Boundaries -->
+        <rect x="30" y="46" width="300" height="616" rx="14" fill="none" stroke="#22d3ee" stroke-width="1.2" stroke-dasharray="8,4"/>
+        <text x="48" y="72" fill="#22d3ee" font-size="11" font-weight="700">AGENT RUNTIME</text>
+
+        <rect x="370" y="46" width="390" height="616" rx="14" fill="none" stroke="#34d399" stroke-width="1.2" stroke-dasharray="8,4"/>
+        <text x="388" y="72" fill="#34d399" font-size="11" font-weight="700">MNEME SERVICE</text>
+
+        <rect x="800" y="46" width="290" height="616" rx="14" fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="8,4"/>
+        <text x="818" y="72" fill="#a78bfa" font-size="11" font-weight="700">STORAGE + OPTIONAL MODELS</text>
+
+        <!-- Arrows behind boxes -->
+        <path d="M 270 166 C 325 166, 335 166, 390 166" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrowhead)"/>
+        <path d="M 270 266 C 330 266, 340 266, 390 266" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrowhead)"/>
+        <path d="M 390 368 C 335 368, 325 368, 270 368" fill="none" stroke="#22d3ee" stroke-width="1.8" marker-end="url(#arrowheadCyan)"/>
+        <path d="M 650 166 C 705 166, 740 166, 820 166" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrowhead)"/>
+        <path d="M 650 266 C 705 266, 740 266, 820 266" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrowhead)"/>
+        <path d="M 650 366 C 705 366, 740 366, 820 366" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrowhead)"/>
+        <path d="M 650 466 C 705 466, 740 466, 820 466" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrowhead)"/>
+        <path d="M 270 512 C 360 592, 748 592, 820 536" fill="none" stroke="#fb7185" stroke-width="1.4" stroke-dasharray="5,5" marker-end="url(#arrowheadRose)"/>
+
+        <!-- Agent runtime boxes -->
+        <rect x="70" y="122" width="200" height="88" rx="8" fill="#0f172a"/>
+        <rect x="70" y="122" width="200" height="88" rx="8" fill="rgba(8, 51, 68, 0.42)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="170" y="149" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Agent Adapter</text>
+        <text x="170" y="168" fill="#94a3b8" font-size="9" text-anchor="middle">REST / SDK / hooks</text>
+        <text x="170" y="187" fill="#94a3b8" font-size="9" text-anchor="middle">normalizes runtime events</text>
+
+        <rect x="70" y="222" width="200" height="88" rx="8" fill="#0f172a"/>
+        <rect x="70" y="222" width="200" height="88" rx="8" fill="rgba(8, 51, 68, 0.42)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="170" y="249" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Lifecycle Contract</text>
+        <text x="170" y="268" fill="#94a3b8" font-size="9" text-anchor="middle">session / event / turn</text>
+        <text x="170" y="287" fill="#94a3b8" font-size="9" text-anchor="middle">request preparation</text>
+
+        <rect x="70" y="324" width="200" height="88" rx="8" fill="#0f172a"/>
+        <rect x="70" y="324" width="200" height="88" rx="8" fill="rgba(8, 51, 68, 0.42)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="170" y="351" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">LLM Request</text>
+        <text x="170" y="370" fill="#94a3b8" font-size="9" text-anchor="middle">request-only context</text>
+        <text x="170" y="389" fill="#94a3b8" font-size="9" text-anchor="middle">original transcript intact</text>
+
+        <rect x="70" y="468" width="200" height="88" rx="8" fill="#0f172a"/>
+        <rect x="70" y="468" width="200" height="88" rx="8" fill="rgba(8, 51, 68, 0.42)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="170" y="495" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Memory Tools</text>
+        <text x="170" y="514" fill="#94a3b8" font-size="9" text-anchor="middle">search / fetch / expand</text>
+        <text x="170" y="533" fill="#94a3b8" font-size="9" text-anchor="middle">MCP-friendly</text>
+
+        <!-- Mneme service boxes -->
+        <rect x="390" y="122" width="260" height="88" rx="8" fill="#0f172a"/>
+        <rect x="390" y="122" width="260" height="88" rx="8" fill="rgba(6, 78, 59, 0.42)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="520" y="149" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Ingestion Pipeline</text>
+        <text x="520" y="168" fill="#94a3b8" font-size="9" text-anchor="middle">stable ids, redaction, parsing</text>
+        <text x="520" y="187" fill="#94a3b8" font-size="9" text-anchor="middle">raw events are preserved</text>
+
+        <rect x="390" y="222" width="260" height="88" rx="8" fill="#0f172a"/>
+        <rect x="390" y="222" width="260" height="88" rx="8" fill="rgba(6, 78, 59, 0.42)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="520" y="249" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Retrieval Router</text>
+        <text x="520" y="268" fill="#94a3b8" font-size="9" text-anchor="middle">semantic + lexical + recency</text>
+        <text x="520" y="287" fill="#94a3b8" font-size="9" text-anchor="middle">segment and session aware</text>
+
+        <rect x="390" y="322" width="260" height="88" rx="8" fill="#0f172a"/>
+        <rect x="390" y="322" width="260" height="88" rx="8" fill="rgba(6, 78, 59, 0.42)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="520" y="349" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Context Assembler</text>
+        <text x="520" y="368" fill="#94a3b8" font-size="9" text-anchor="middle">system + state + tail + evidence</text>
+        <text x="520" y="387" fill="#94a3b8" font-size="9" text-anchor="middle">token-budget packing</text>
+
+        <rect x="390" y="422" width="260" height="88" rx="8" fill="#0f172a"/>
+        <rect x="390" y="422" width="260" height="88" rx="8" fill="rgba(6, 78, 59, 0.42)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="520" y="449" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Trace + Cost Meter</text>
+        <text x="520" y="468" fill="#94a3b8" font-size="9" text-anchor="middle">latency, tokens, selected events</text>
+        <text x="520" y="487" fill="#94a3b8" font-size="9" text-anchor="middle">audit every memory read</text>
+
+        <rect x="390" y="542" width="260" height="72" rx="8" fill="#0f172a"/>
+        <rect x="390" y="542" width="260" height="72" rx="8" fill="rgba(251, 146, 60, 0.28)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="520" y="569" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Operating Modes</text>
+        <text x="520" y="588" fill="#94a3b8" font-size="9" text-anchor="middle">minimal / standard / quality</text>
+
+        <!-- Storage + models boxes -->
+        <rect x="820" y="122" width="220" height="88" rx="8" fill="#0f172a"/>
+        <rect x="820" y="122" width="220" height="88" rx="8" fill="rgba(76, 29, 149, 0.42)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="930" y="149" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Event Store</text>
+        <text x="930" y="168" fill="#94a3b8" font-size="9" text-anchor="middle">SQLite / Postgres later</text>
+        <text x="930" y="187" fill="#94a3b8" font-size="9" text-anchor="middle">raw evidence + metadata</text>
+
+        <rect x="820" y="222" width="220" height="88" rx="8" fill="#0f172a"/>
+        <rect x="820" y="222" width="220" height="88" rx="8" fill="rgba(76, 29, 149, 0.42)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="930" y="249" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Vector Index</text>
+        <text x="930" y="268" fill="#94a3b8" font-size="9" text-anchor="middle">sqlite-vec / pgvector</text>
+        <text x="930" y="287" fill="#94a3b8" font-size="9" text-anchor="middle">optional embeddings</text>
+
+        <rect x="820" y="322" width="220" height="88" rx="8" fill="#0f172a"/>
+        <rect x="820" y="322" width="220" height="88" rx="8" fill="rgba(76, 29, 149, 0.42)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="930" y="349" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Execution Graph</text>
+        <text x="930" y="368" fill="#94a3b8" font-size="9" text-anchor="middle">tool call -> output -> decision</text>
+        <text x="930" y="387" fill="#94a3b8" font-size="9" text-anchor="middle">causal expansion</text>
+
+        <rect x="820" y="422" width="220" height="88" rx="8" fill="#0f172a"/>
+        <rect x="820" y="422" width="220" height="88" rx="8" fill="rgba(76, 29, 149, 0.42)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="930" y="449" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Optional Models</text>
+        <text x="930" y="468" fill="#94a3b8" font-size="9" text-anchor="middle">embedding / rerank / enrichment</text>
+        <text x="930" y="487" fill="#94a3b8" font-size="9" text-anchor="middle">all cost-metered</text>
+
+        <rect x="820" y="522" width="220" height="88" rx="8" fill="#0f172a"/>
+        <rect x="820" y="522" width="220" height="88" rx="8" fill="rgba(136, 19, 55, 0.34)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="930" y="549" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Privacy Controls</text>
+        <text x="930" y="568" fill="#94a3b8" font-size="9" text-anchor="middle">local-first, export, delete</text>
+        <text x="930" y="587" fill="#94a3b8" font-size="9" text-anchor="middle">redaction + audit logs</text>
+
+        <!-- Flow labels -->
+        <text x="330" y="154" fill="#94a3b8" font-size="8" text-anchor="middle">events</text>
+        <text x="332" y="254" fill="#94a3b8" font-size="8" text-anchor="middle">prepare</text>
+        <text x="328" y="354" fill="#22d3ee" font-size="8" text-anchor="middle">request context</text>
+        <text x="720" y="154" fill="#94a3b8" font-size="8" text-anchor="middle">persist</text>
+        <text x="720" y="254" fill="#94a3b8" font-size="8" text-anchor="middle">index</text>
+        <text x="720" y="354" fill="#94a3b8" font-size="8" text-anchor="middle">causality</text>
+        <text x="720" y="454" fill="#94a3b8" font-size="8" text-anchor="middle">optional calls</text>
+
+        <!-- Legend -->
+        <rect x="58" y="675" width="1004" height="28" rx="6" fill="rgba(15, 23, 42, 0.82)" stroke="#1e293b"/>
+        <circle cx="86" cy="689" r="5" fill="#22d3ee"/>
+        <text x="99" y="693" fill="#94a3b8" font-size="8">runtime adapter</text>
+        <circle cx="226" cy="689" r="5" fill="#34d399"/>
+        <text x="239" y="693" fill="#94a3b8" font-size="8">service logic</text>
+        <circle cx="358" cy="689" r="5" fill="#a78bfa"/>
+        <text x="371" y="693" fill="#94a3b8" font-size="8">storage/index</text>
+        <circle cx="494" cy="689" r="5" fill="#fb923c"/>
+        <text x="507" y="693" fill="#94a3b8" font-size="8">cost modes</text>
+        <circle cx="620" cy="689" r="5" fill="#fb7185"/>
+        <text x="633" y="693" fill="#94a3b8" font-size="8">privacy boundary</text>
+        <text x="966" y="693" fill="#64748b" font-size="8" text-anchor="end">request-only assembly; original transcript remains authoritative</text>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <section class="card">
+        <h3>Core Promise</h3>
+        <ul>
+          <li>Raw agent events remain preserved.</li>
+          <li>Context is assembled per request, not persisted over transcript.</li>
+          <li>Agents can search, fetch, and expand memory evidence.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h3>Cost Controls</h3>
+        <ul>
+          <li>Minimal mode works without embeddings or LLM enrichment.</li>
+          <li>Standard mode adds local embeddings and hybrid retrieval.</li>
+          <li>Quality mode adds rerank, graph expansion, and enrichment.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h3>Adoption Path</h3>
+        <ul>
+          <li>REST API for generic runtimes.</li>
+          <li>MCP server for Codex, Claude Code, and compatible clients.</li>
+          <li>Reference adapters for Hermes, LangGraph, and OpenAI Agents SDK.</li>
+        </ul>
+      </section>
+    </div>
+
+    <footer>Mneme Universal Context Service · concept diagram · 2026-06-08</footer>
+  </div>
+
+  <script>
+    function captureOptions() {
+      const el = document.getElementById("report-container");
+      const rect = el.getBoundingClientRect();
+      return {
+        x: rect.left - 32 + window.scrollX,
+        y: rect.top - 32 + window.scrollY,
+        width: rect.width + 64,
+        height: rect.height + 64,
+        scale: 2,
+        backgroundColor: "#020617",
+        ignoreElements: node => node && node.classList && node.classList.contains("toolbar")
+      };
+    }
+
+    async function makeCanvas() {
+      return html2canvas(document.body, captureOptions());
+    }
+
+    async function copyAsImage() {
+      const canvas = await makeCanvas();
+      canvas.toBlob(async blob => {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      });
+    }
+
+    async function downloadPNG() {
+      const canvas = await makeCanvas();
+      const link = document.createElement("a");
+      link.download = "mneme-universal-context-service.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
+
+    async function downloadPDF() {
+      const canvas = await makeCanvas();
+      const img = canvas.toDataURL("image/png");
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(img, "PNG", 0, 0, canvas.width, canvas.height);
+      pdf.save("mneme-universal-context-service.pdf");
+    }
+  </script>
+</body>
+</html>
+
