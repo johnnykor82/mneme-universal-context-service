@@ -85,6 +85,9 @@ the REST/MCP contracts. MCP gives tool-capable hosts agent-callable memory
 tools; automatic request-context assembly requires a host lifecycle hook as
 defined in [MNEME_HOST_ADAPTER_CONTRACT_V0.md](MNEME_HOST_ADAPTER_CONTRACT_V0.md).
 
+Codex Desktop users should install the separate adapter:
+[johnnykor82/mneme-codex-adapter](https://github.com/johnnykor82/mneme-codex-adapter).
+
 ## Tests
 
 ```bash

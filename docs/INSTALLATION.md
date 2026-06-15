@@ -60,3 +60,6 @@ when embeddings are missing instead of silently running keyword-only memory.
 Runtime-specific adapters install separately. A host adapter should connect to
 this daemon through the REST/MCP contracts and declare its integration depth
 according to [MNEME_HOST_ADAPTER_CONTRACT_V0.md](../MNEME_HOST_ADAPTER_CONTRACT_V0.md).
+
+For Codex Desktop, use the separate adapter repository:
+`https://github.com/johnnykor82/mneme-codex-adapter`.
