@@ -1,0 +1,84 @@
+# Mneme local configuration example.
+# Real API keys should come from environment variables, not this tracked file:
+# MNEME_EMBEDDING_API_KEY, MNEME_RERANKER_API_KEY, MNEME_LLM_API_KEY.
+
+[daemon]
+db_path = ".local/mneme.db"
+host = "127.0.0.1"
+port = 8765
+insecure_dev = false
+# Keep false for local dev/CI minimal mode. Set true for dogfood or production-
+# like semantic memory so the daemon fails fast if embeddings are not configured.
+require_embeddings = false
+max_batch_events = 200
+max_event_content_bytes = 1048576
+max_tool_result_events = 50
+
+[budget]
+active_window_tokens = 0
+context_window_usage_percent = 0.70
+protected_tail_turns = 64
+state_budget_ratio = 0.05
+retrieved_budget_ratio = 0.30
+protected_tail_ratio = 0.55
+pass_through_overhead_initial = 16000
+
+[segmentation]
+enabled = true
+drift_threshold = 0.35
+drift_weights = [0.4, 0.3, 0.3]
+centroid_cache_size = 100
+centroid_window = 200
+
+[retrieval]
+router_top_k = 0
+router_min_candidates = 12
+dependency_max_depth = 4
+dependency_decay = 0.6
+reranker_top_k = 0
+
+[enrichment]
+every_n_turns = 5
+on_segment_boundary = true
+max_history_turns = 10
+timeout_seconds = 30.0
+max_tokens = 1500
+
+[embedding_index]
+tool_output_compress_threshold_tokens = 500
+tool_output_summary_tokens = 100
+reindex_on_model_change = false
+
+[memory]
+memory_access_hint_enabled = true
+goal_trail_size = 3
+checkpoint_after_n_memory_calls = 5
+memory_tool_names = [
+  "context_search",
+  "fetch_event",
+  "expand_context",
+  "list_segments",
+  "get_goal_history",
+]
+
+[providers.embeddings]
+enabled = false
+provider = "openai_compatible"
+model = "text-embedding-3-small"
+base_url = "https://api.openai.com/v1"
+timeout_seconds = 30.0
+batch_size = 16
+
+[providers.reranker]
+enabled = false
+provider = "jina"
+model = "jina-reranker-v2-base-multilingual"
+base_url = "https://api.jina.ai/v1"
+timeout_seconds = 30.0
+
+[providers.llm_enrichment]
+enabled = false
+provider = "openai_compatible"
+model = "gpt-4.1-mini"
+base_url = "https://api.openai.com/v1"
+timeout_seconds = 30.0

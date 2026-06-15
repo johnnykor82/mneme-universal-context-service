@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mneme-context-service"
+version = "0.1.0"
+description = "Local-first context memory service for tool-using agents"
+authors = [{ name = "Ivan Konstantinov" }]
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+keywords = ["agents", "memory", "context", "mcp", "fastapi"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Framework :: FastAPI",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "pydantic>=2.8",
+  "mcp>=1.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "httpx>=0.27",
+  "pytest>=8.0",
+]
+
+[project.scripts]
+mneme = "mneme_service.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mneme_service*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

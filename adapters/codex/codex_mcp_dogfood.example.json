@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "mneme": {
+      "command": "/Users/openclaw/.hermes/plugins/_mneme-universal-context-service/.venv/bin/python",
+      "args": [
+        "-m",
+        "mneme_service.cli",
+        "mcp",
+        "--base-url",
+        "http://127.0.0.1:8767"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/openclaw/.hermes/plugins/_mneme-universal-context-service",
+        "MNEME_AUTH_TOKEN": "<mneme-auth-token>"
+      }
+    }
+  }
+}
