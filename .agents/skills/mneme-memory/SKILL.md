@@ -31,24 +31,31 @@ and prior assistant reasoning.
 MCP remains read-only in this Codex workflow. Do not invent write behavior or
 claim that MCP replaces Codex prompt context.
 
+Do not guess Mneme `session_id` values from project names such as `default` or
+repo slugs. If a valid id is not already known from the user, local files, or a
+trusted hook/importer output, resolve it first through Mneme discovery tools.
+
 ## Recovery Workflow
 
 1. Read the local planning files.
-2. If Mneme MCP is available, call `mcp__mneme.get_execution_state` for the
-   relevant `session_id`.
-3. Call `mcp__mneme.get_goal_history` when reconstructing why the current goal
+2. If Mneme MCP is available and the relevant `session_id` is unknown, call
+   `mcp__mneme.resolve_session` with `project_path`, `thread_id`, `slug`, or
+   `query`; use `mcp__mneme.list_sessions` when resolution is ambiguous.
+3. Call `mcp__mneme.get_execution_state` only after a valid `session_id` is
+   known.
+4. Call `mcp__mneme.get_goal_history` when reconstructing why the current goal
    changed.
-4. Call `mcp__mneme.context_search` for semantic evidence about the current
+5. Call `mcp__mneme.context_search` for semantic evidence about the current
    question or implementation area.
-5. Use `mcp__mneme.fetch_event` for the source event behind an important search
+6. Use `mcp__mneme.fetch_event` for the source event behind an important search
    hit.
-6. Use `mcp__mneme.expand_context` when a fetched event depends on tool calls,
+7. Use `mcp__mneme.expand_context` when a fetched event depends on tool calls,
    decisions, or adjacent events.
-7. Use `mcp__mneme.recall_recent` for recent-turn reconstruction.
-8. Use `mcp__mneme.list_segments` to inspect topic boundaries in long sessions.
-9. Use `mcp__mneme.explain_context` when you need to justify why evidence was
+8. Use `mcp__mneme.recall_recent` for recent-turn reconstruction.
+9. Use `mcp__mneme.list_segments` to inspect topic boundaries in long sessions.
+10. Use `mcp__mneme.explain_context` when you need to justify why evidence was
    selected or dropped.
-10. Use `mcp__mneme.mneme_cost_report` when checking provider-safe behavior,
+11. Use `mcp__mneme.mneme_cost_report` when checking provider-safe behavior,
    optional embeddings/reranking/enrichment cost, or dogfood health.
 
 ## Evidence Rules

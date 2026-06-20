@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 TOOL_NAMES = (
+    "resolve_session",
+    "list_sessions",
     "context_search",
     "fetch_event",
     "expand_context",

@@ -6,7 +6,8 @@ Turn the idea behind `hermes-mneme` into a vendor-neutral context-management ser
 
 ## Current Phase
 
-Phase 13: Codex memory dogfood and knowledge-base workflow - in progress; next focus is GitHub publication and second-machine rehearsal.
+Phase 13: Codex memory dogfood and knowledge-base workflow - in progress; next focus is updated global Codex install rehearsal on the second machine.
+Phase 13B: Codex/MCP session discovery hotfix - complete; next action is publish updated core package so global Codex MCP sees `resolve_session` and `list_sessions`.
 Phase 14C: full Hermes-Mneme parity completion - complete.
 Phase 14B: parity hardening while Hermes PR is pending - complete.
 Phase 16: Hermes host adapter planning - deferred until upstream Hermes context-engine hook PR is accepted.
@@ -35,18 +36,41 @@ Phase 10 MCP server and adapter substrate is complete.
 - Design docs, examples, CLIs, and adapter setup for future public GitHub users:
   installation should be automatable, understandable, and not depend on this
   developer machine's private paths or live Hermes state.
+- Public publication must keep product boundaries clean: the Mneme engine/core
+  repository is separate from host adapters, and each adapter belongs in its
+  own repository/package such as a future Codex adapter repository. Internal
+  dogfood notes, local rehearsal prompts, and project planning files are not
+  user-facing GitHub installation artifacts.
 - Local real Codex Desktop hook validation, REST/context-preview smoke, real
   preview-hook rehearsal, and MCP recall now pass. Do not claim automatic Codex
   prompt insertion: current documented Codex command hooks can prepare/write
   preview files, but no context-build prompt replacement hook is documented.
-  Phase 14C full original-core parity completion is complete. Mneme plus the
-  Codex adapter is published at
-  `https://github.com/johnnykor82/mneme-universal-context-service`; next it
-  should be installed on the second Codex machine as a new-user setup.
+  Phase 14C full original-core parity completion is complete. The first mixed
+  GitHub publication accidentally combined engine, Codex adapter, and internal
+  planning materials; it has been quarantined as a private repository and must
+  not be treated as the public install source. The clean engine/core public
+  repository `johnnykor82/mneme-universal-context-service` is now published
+  from a sanitized root commit. The separate Codex adapter repository/package
+  `johnnykor82/mneme-codex-adapter` is also published from a sanitized root
+  commit. Next work is second-machine rehearsal.
 - Support the user's two-machine Codex workflow: shared symlinked files may
   propagate docs/skills/config examples, but Mneme runtime installation, daemon,
   MCP config, tokens, database paths, and hook trust must be verified per
   machine.
+- Second-machine developer-style install rehearsal passed, but showed the
+  GitHub docs were still too developer-oriented for ordinary Codex Desktop
+  users. The next rehearsal should use the new user-global Codex quickstart and
+  `mneme-codex setup/doctor/status` path rather than a workspace-only sandbox
+  install.
+- Second-machine global install feedback polish is published in the Codex
+  adapter repository at commit `47a2127`: the global flow now has
+  install-root token resolution, macOS LaunchAgent service commands,
+  install-root entrypoint checks in doctor/status, generated `mneme.toml`,
+  provider configuration guidance, and clearer MCP-vs-plugin wording.
+- Required `mneme-memory` skill install polish is published in the Codex
+  adapter repository at commit `2a76286`: the adapter package now includes the
+  skill as package data and exposes `mneme-codex skill install`, and public
+  install docs make the skill required for expected Codex behavior.
 
 ## Phases
 
@@ -169,9 +193,34 @@ Phase 10 MCP server and adapter substrate is complete.
       `.codex/hooks.json` for trusted local Codex hook rehearsal.
 - [x] Document the two-machine/symlink Codex setup constraint and per-machine Mneme install/verify requirement.
 - [ ] Validate real Codex hook payloads and convert the disabled hook contract example into an enable-ready user setup path.
-- [ ] After local hook validation and Phase 14C full parity completion, publish
-      Mneme plus the Codex adapter to the user's GitHub and run a
-      second-machine install rehearsal from GitHub as a new-user flow.
+- [x] After local hook validation and Phase 14C full parity completion, attempt
+      first GitHub publication.
+- [x] Quarantine the first mixed publication as private because it combined
+      engine, Codex adapter, and internal planning/dogfood material.
+- [x] Prepare a clean public Mneme engine/core repository without host-specific
+      adapters or internal planning files:
+      `johnnykor82/mneme-universal-context-service`.
+- [x] Prepare a separate Codex adapter repository/package that depends on the
+      Mneme engine/core and contains Codex-specific hooks, skills, and setup:
+      `johnnykor82/mneme-codex-adapter`.
+- [x] Read the second-machine install feedback from shared Codex files and
+      identify public-install UX gaps: linear Codex Desktop quickstart, install
+      scope, daemon lifecycle, MCP registration, hook ladder, doctor/status,
+      and safe uninstall/reinstall expectations.
+- [x] Add the first user-global Codex Desktop setup path:
+      `mneme-codex setup codex-desktop --global`, `mneme-codex doctor`,
+      `mneme-codex status`, generated local runtime files, token-safe MCP
+      snippets, sample transcript smoke input, and a quickstart.
+- [x] Publish the updated Codex adapter/core docs to GitHub for the next
+      second-machine global install rehearsal.
+- [x] Apply the first global-install feedback polish to the Codex adapter:
+      token-safe sample ingest via `--install-root`, `mneme-codex service`
+      LaunchAgent commands, install-root entrypoint checks, generated
+      `mneme.toml`, provider setup docs, and MCP/plugin clarification.
+- [x] Add an explicit required `mneme-memory` skill installation path to the
+      Codex adapter package and public install docs.
+- [ ] Rerun a second-machine global install rehearsal from the clean public
+      engine/adapter repositories as a new-user flow.
 - [x] Before publication/second-machine rehearsal, run a real provider smoke
       proving dogfood embeddings are required and working, embedding rows are
       written on ingest, and enabled reranker calls succeed.
@@ -195,6 +244,23 @@ Phase 10 MCP server and adapter substrate is complete.
 - [x] Identify parity gaps: semantic search, provider config, embedding index, reranking, LLM enrichment, execution state, segmentation, intent routing, graph scoring, and budgeted prompt assembly.
 - [x] Recommend reordering the next implementation milestone toward parity recovery before further Codex dogfood polish.
 - **Status:** complete
+
+### Phase 13B: Codex/MCP Session Discovery Hotfix
+
+- [x] Diagnose why Codex agents guessed Mneme `session_id` values such as `default` or project slugs.
+- [x] Confirm existing MCP memory tools required a valid internal `session_id` and did not expose a discovery/resolve path.
+- [x] Confirm Codex hook/importer sessions already store enough metadata for discovery: `session_id`, `project_id`, `metadata.cwd`, and optional `metadata.thread_id`.
+- [x] Add REST/MCP read-only discovery tools:
+      `resolve_session` and `list_sessions`.
+- [x] Improve `Session not found` details so `NOT_FOUND` tells agents to use discovery tools and includes bounded candidate sessions.
+- [x] Update `mneme-memory` skill, Codex MCP usage docs, AGENTS snippet, and dogfood handoff docs to forbid guessing `session_id`.
+- [x] Add `docs/MNEME_DEVELOPMENT_SPEC.md` as the reviewer-facing project specification/index and link it from `README.md`.
+- [x] Verify the global local Codex database has sessions and that the real `_rlm-orchestrator` session id is
+      `019edb86-1d22-78a3-b9e4-e6121c294056`.
+- [x] Run focused REST/MCP tests and syntax checks.
+- **Acceptance criteria:** a new Codex/MCP agent can find or resolve a valid Mneme session id using project path, thread id, slug, or query before calling session-bound memory tools.
+- **Verification:** focused `pytest` for REST/MCP discovery passed; `py_compile` passed; live MCP read succeeded with the real `_rlm-orchestrator` session id.
+- **Status:** complete; publication/install update still required for the already-installed global Codex MCP environment.
 
 ### Phase 14: Hermes-Mneme Functional Parity Recovery
 
@@ -301,14 +367,16 @@ Phase 10 MCP server and adapter substrate is complete.
 11. Should session drift wiring live only in the Hermes adapter?
    - Answer: no. Host-specific hook wiring stays in adapters, but runtime-neutral drift semantics belong in the daemon: semantic topic drift, segment boundaries, resume/fresh-session classification, lineage/carry-over policy, first-turn resume context fill, and traces.
 12. Is the repository ready for public open-source publication?
-   - Answer: publication-prep materials exist, but actual publication is now gated on Phase 14C full original-core parity completion.
+   - Answer: publication-prep materials exist and Phase 14C is complete, but the first mixed publication exposed the wrong product boundary. Public release now requires a clean split: engine/core repo separately, host adapters separately, and internal planning/dogfood material excluded.
 13. Should Hermes adapter planning/implementation start now?
    - Answer: no. It is deferred until the upstream Hermes context-engine hook PR is accepted. Building against the legacy compaction path would create duplicate/throwaway integration work.
 14. When should Mneme and the Codex adapter be published to GitHub?
    - Answer: after local trusted Codex hook payload validation, enable-ready
-     setup docs, and Phase 14C full parity completion. Publication should then
-     be immediately tested by installing from the user's GitHub on the second
-     Codex machine as if a new user were setting it up.
+     setup docs, and Phase 14C full parity completion, but not as one mixed
+     public repository. Mneme engine/core should publish first as clean
+     `johnnykor82/mneme-universal-context-service`; Codex should publish as
+     separate `johnnykor82/mneme-codex-adapter`; then the second machine should
+     test installing both as if by a new user.
 
 ## Decisions Made
 
@@ -331,7 +399,7 @@ Phase 10 MCP server and adapter substrate is complete.
 | Next implementation should recover `hermes-mneme` quality-pipeline parity before more Codex polish. | Codex dogfood should exercise real semantic/execution-state memory, not only keyword/recency retrieval over a database. |
 | Adapter work is paused until functional parity recovery. | Adapters should connect to a real Mneme context engine, not to a keyword-only storage substrate. |
 | Session/topic drift semantics belong in the daemon, while host hook plumbing belongs in adapters. | Drift is part of memory quality for every runtime; adapters should only translate runtime lifecycle events into Mneme lifecycle metadata. |
-| `adapters/codex` remains in this repository for first publication prep. | The current Codex integration is a tools-only MCP/reference-ingestion path; a separate package should wait until live ingestion or deeper host integration stabilizes. |
+| First mixed GitHub publication is quarantined private. | It combined engine, Codex adapter, and internal planning/dogfood material. Public release must use a clean core/adapters split. |
 | Public open-source release required an owner-selected license. | License choice was a legal/product decision; Ivan Konstantinov selected Apache-2.0. |
 | Defer Hermes adapter work until upstream native hooks land. | The clean integration depends on Hermes context-engine lifecycle hooks; building against compaction now risks duplicate work and later rewrites. |
 | Keep the pre-Phase-14 comparison as historical context, but add current status above it. | The old table explains why parity recovery happened, but post-Phase-14 readers need a current residual-gap view. |

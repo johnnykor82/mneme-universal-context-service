@@ -34,6 +34,14 @@ Mneme has two integration modes:
 See [MNEME_HOST_ADAPTER_CONTRACT_V0.md](MNEME_HOST_ADAPTER_CONTRACT_V0.md) for
 the host adapter contract.
 
+## Specification
+
+For architecture/code review, start with
+[docs/MNEME_DEVELOPMENT_SPEC.md](docs/MNEME_DEVELOPMENT_SPEC.md). It ties the
+business requirements, product boundary, functional requirements, architecture,
+contracts, security model, tests, and traceability links into one reviewer-facing
+index spec.
+
 ## Quick Start
 
 Current source-checkout install:
@@ -77,11 +85,18 @@ See [docs/PROVIDER_CONFIGURATION.md](docs/PROVIDER_CONFIGURATION.md).
 
 For installation details, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
-## Codex Usage
+## Adapter Status
+
+This development checkout currently contains Codex adapter work under
+`adapters/codex` while the public split is being prepared. The public engine
+repository should keep host adapters out of the core package; Codex-specific
+hooks, skills, and setup docs belong in a separate adapter repository/package.
 
 Codex can use Mneme through MCP as agent-callable memory tools. This is
 tools-only integration, not automatic prompt replacement.
 
+- [adapters/codex/CODEX_AGENT_INSTALL.md](adapters/codex/CODEX_AGENT_INSTALL.md)
+- [adapters/codex/CODEX_DESKTOP_QUICKSTART.md](adapters/codex/CODEX_DESKTOP_QUICKSTART.md)
 - [adapters/codex/MNEME_CODEX_MCP_USAGE.md](adapters/codex/MNEME_CODEX_MCP_USAGE.md)
 - [adapters/codex/MNEME_CODEX_INGEST_USAGE.md](adapters/codex/MNEME_CODEX_INGEST_USAGE.md)
 - [adapters/codex/MNEME_CODEX_HOOKS_USAGE.md](adapters/codex/MNEME_CODEX_HOOKS_USAGE.md)
@@ -130,5 +145,8 @@ publication preparation is complete with Apache-2.0 licensing.
 
 The publication checklist is tracked in
 [docs/PUBLICATION_CHECKLIST.md](docs/PUBLICATION_CHECKLIST.md).
-Future adapter work should keep GitHub installation understandable and
-automatable for users who do not have this local development environment.
+Future publication must keep GitHub installation understandable and automatable
+for users who do not have this local development environment, with Mneme
+engine/core and host adapters published separately. Chosen public repository
+names are `johnnykor82/mneme-universal-context-service` for core and
+`johnnykor82/mneme-codex-adapter` for the Codex adapter.

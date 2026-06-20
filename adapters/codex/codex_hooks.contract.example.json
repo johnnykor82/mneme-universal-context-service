@@ -6,7 +6,7 @@
     "requires_real_session_payload_validation": true,
     "mcp_write_tools_enabled": false,
     "rest_ingestion_remains_canonical": true,
-    "planned_command": "mneme codex-hook-ingest --input - --dry-run",
+    "planned_command": "mneme-codex codex-hook-ingest --input - --dry-run",
     "notes": [
       "This is a contract example, not a ready-to-enable hook file.",
       "Enable writes only after real Codex hook payloads are captured and tested.",
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mneme codex-hook-ingest --event SessionStart --input - --dry-run"
+            "command": "mneme-codex codex-hook-ingest --event SessionStart --input - --dry-run"
           }
         ]
       }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mneme codex-hook-ingest --event UserPromptSubmit --input - --dry-run"
+            "command": "mneme-codex codex-hook-ingest --event UserPromptSubmit --input - --dry-run"
           }
         ]
       }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mneme codex-hook-ingest --event PostToolUse --input - --dry-run"
+            "command": "mneme-codex codex-hook-ingest --event PostToolUse --input - --dry-run"
           }
         ]
       }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mneme codex-hook-ingest --event PostCompact --input - --dry-run"
+            "command": "mneme-codex codex-hook-ingest --event PostCompact --input - --dry-run"
           }
         ]
       }
@@ -65,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mneme codex-hook-ingest --event Stop --input - --dry-run"
+            "command": "mneme-codex codex-hook-ingest --event Stop --input - --dry-run"
           }
         ]
       }

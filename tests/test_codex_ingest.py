@@ -169,7 +169,7 @@ def test_codex_ingest_usage_docs_are_offline_reference_only() -> None:
     guide = guide_path.read_text(encoding="utf-8")
 
     assert "offline/reference" in guide
-    assert "mneme codex-ingest --input transcript.json" in guide
+    assert "mneme-codex codex-ingest --input transcript.json" in guide
     assert "does not modify live Codex configuration" in guide
     assert "POST /v1/sessions/start" in guide
     assert "POST /v1/events" in guide

@@ -45,11 +45,37 @@ dogfood workflow over those capabilities.
   service/adapters without relying on this workstation's private paths. Codex
   adapter artifacts should therefore favor package-relative examples, explicit
   commands, and automatable setup steps.
-- Actual GitHub publication of the Codex hook path is gated behind local
-  real-hook validation and Phase 14C full original-core parity completion. Once
-  both pass, publish Mneme plus `adapters/codex` to the user's GitHub and
-  immediately rehearse installation on the second Codex machine from GitHub as
-  a new-user setup.
+- Public GitHub publication must split Mneme engine/core from host-specific
+  adapters. The first mixed publication was made private and should not be used
+  as the public install source. The corrected path is: publish a clean Mneme
+  core repository, publish the Codex adapter separately, then rehearse
+  installing both on the second Codex machine as a new-user setup.
+- Chosen GitHub names: core engine
+  `johnnykor82/mneme-universal-context-service`; Codex adapter
+  `johnnykor82/mneme-codex-adapter`.
+- Clean core publication is complete from sanitized root commit `01f969d`.
+  The earlier mixed repository is private under
+  `johnnykor82/mneme-universal-context-service-internal-quarantine`.
+- Clean Codex adapter publication is complete from sanitized root commit
+  `d041528`; adapter CLI is `mneme-codex`.
+- The first second-machine install rehearsal passed as a developer alpha but
+  showed that GitHub docs still need a one-path Codex Desktop setup. The next
+  adapter publication should include `mneme-codex setup codex-desktop --global`,
+  `mneme-codex doctor/status`, a token-safe install root, sample transcript
+  smoke input, and a concise Codex Desktop quickstart.
+- Updated public repositories now include the first global-install packaging
+  response plus the feedback polish pass. Core `main` remains at `59bf507`;
+  Codex adapter `main` is at `2a76286` with adapter version `0.1.3`.
+  The remaining gate is a second-machine global-install rehearsal from GitHub.
+- The Codex adapter feedback polish adds the durable macOS LaunchAgent service
+  path, install-root token discovery for REST-writing commands, generated
+  `mneme.toml`, provider setup/restart/verify guidance, install-root
+  entrypoint checks in doctor/status, and explicit MCP-vs-marketplace-plugin
+  wording.
+- The latest Codex adapter also makes `mneme-memory` skill installation
+  explicit and required: `mneme-codex skill install --target-dir
+  "$HOME/.codex/skills"` installs the packaged skill into the user's Codex
+  skills directory or symlinked shared skills target.
 - Official Codex docs now confirm useful adapter surfaces:
   - MCP server-wide `instructions` are read during server initialization;
   - Codex skills can live in repo-local `.agents/skills`;
@@ -254,9 +280,9 @@ Pending before user-facing/public hook setup:
 
 - Convert `adapters/codex/codex_hooks.contract.example.json` from disabled
   dry-run contract into an optional install/setup artifact.
-- After Phase 14C full parity completion, publish the repository plus Codex
-  adapter to the user's GitHub and validate the public install path on the
-  second Codex machine without relying on symlinked shared files.
+- After Phase 14C full parity completion, prepare a clean core repository and a
+  separate Codex adapter repository/package, then validate the public install
+  path on the second Codex machine without relying on symlinked shared files.
 - Keep MCP read-only unless a separate model-callable write contract is created.
 
 Verification:
@@ -273,12 +299,13 @@ hook capture, validation, dry-run, and REST write modes. The write-oriented
 example hook config remains disabled until real Codex hook payloads are
 validated.
 
-## Task 3B: GitHub Publication and Second-Machine Install Rehearsal Gate
+## Task 3B: Split GitHub Publication and Second-Machine Install Rehearsal Gate
 
-**Status:** pending; blocked on Phase 14C full parity completion
+**Status:** in progress; mixed first publication quarantined private
 
-Treat the first public GitHub publication as an installation rehearsal, not only
-as a source-code backup.
+Treat public GitHub publication as an installation rehearsal, not only as a
+source-code backup. The public product shape is engine/core separately and
+host adapters separately.
 
 Gate sequence:
 
@@ -287,10 +314,16 @@ Gate sequence:
 2. Convert the hook example into an enable-ready user setup path while keeping
    dry-run and trust steps explicit.
 3. Complete Phase 14C full original-core parity gate.
-4. Publish Mneme plus the Codex adapter to the user's GitHub.
-5. On the second Codex machine, install from GitHub as if it were a new user
+4. Quarantine any mixed engine/adapter/internal publication as private.
+5. Publish clean `johnnykor82/mneme-universal-context-service` as the Mneme
+   engine/core repository with no host-specific adapters and no internal
+   planning/dogfood artifacts. Status: complete.
+6. Publish separate `johnnykor82/mneme-codex-adapter` as the Codex adapter
+   repository/package that depends on the Mneme core and contains
+   Codex-specific hooks, skills, and setup. Status: complete.
+7. On the second Codex machine, install from GitHub as if it were a new user
    setup rather than relying on the shared symlinked files.
-6. Verify per-machine runtime pieces: `mneme serve`, `mneme mcp`, auth token,
+8. Verify per-machine runtime pieces: `mneme serve`, `mneme mcp`, auth token,
    database path, provider secrets if used, MCP visibility, hook
    capture/validation, and a simple REST-ingestion plus MCP-recall smoke path.
 

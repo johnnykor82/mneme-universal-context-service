@@ -12,7 +12,7 @@ Capture real Codex hook payloads into an untracked local JSONL file before
 enabling writes:
 
 ```bash
-mneme codex-hook-capture --input - --event Stop --output .local/mneme-codex-hooks.jsonl
+mneme-codex codex-hook-capture --input - --event Stop --output .local/mneme-codex-hooks.jsonl
 ```
 
 For a real local Codex hook rehearsal, generate a machine-local capture config
@@ -49,7 +49,7 @@ before they run.
 Validate the captured payloads:
 
 ```bash
-mneme codex-hook-validate --input .local/mneme-codex-hooks.jsonl
+mneme-codex codex-hook-validate --input .local/mneme-codex-hooks.jsonl
 ```
 
 The validation report does not include raw content. It checks whether payloads
@@ -63,13 +63,13 @@ project/cwd, capture timestamp, and usable Codex content fields such as
 Start with a JSON payload and inspect the normalized Mneme payloads:
 
 ```bash
-mneme codex-hook-ingest --input hook.json --event Stop --dry-run
+mneme-codex codex-hook-ingest --input hook.json --event Stop --dry-run
 ```
 
 Use `--input -` when a Codex command hook passes JSON on standard input:
 
 ```bash
-mneme codex-hook-ingest --input - --event PostCompact --dry-run
+mneme-codex codex-hook-ingest --input - --event PostCompact --dry-run
 ```
 
 Dry-run first is required for new hook events. Confirm `session_id`, `turn_id`,
@@ -82,11 +82,11 @@ When verified, remove `--dry-run` and point the command at the local Mneme REST
 daemon:
 
 ```bash
-mneme codex-hook-ingest \
+mneme-codex codex-hook-ingest \
   --input hook.json \
   --event Stop \
   --base-url http://127.0.0.1:8765 \
-  --token "$MNEME_AUTH_TOKEN"
+  --install-root "$HOME/.mneme-codex"
 ```
 
 REST ingestion remains canonical. The command calls:
@@ -100,10 +100,10 @@ write tool and does not replace Codex prompt context.
 To replay a local capture file into a test daemon:
 
 ```bash
-mneme codex-hook-import-capture \
+mneme-codex codex-hook-import-capture \
   --input .local/mneme-codex-hooks.jsonl \
   --base-url http://127.0.0.1:8765 \
-  --token "$MNEME_AUTH_TOKEN"
+  --install-root "$HOME/.mneme-codex"
 ```
 
 ## Context Preview File
@@ -117,12 +117,12 @@ Use `UserPromptSubmit` to ask Mneme what it would prepare, then write that
 response to an untracked local JSONL file for inspection:
 
 ```bash
-mneme codex-hook-prepare-preview \
+mneme-codex codex-hook-prepare-preview \
   --input .local/mneme-codex-hooks.jsonl \
   --event UserPromptSubmit \
   --output .local/mneme-codex-context-preview.jsonl \
   --base-url http://127.0.0.1:8765 \
-  --token "$MNEME_AUTH_TOKEN"
+  --install-root "$HOME/.mneme-codex"
 ```
 
 The preview record includes the `/v1/context/prepare` request, the prepared
@@ -158,8 +158,8 @@ are per-machine.
 For the second machine, repeat capture-only validation locally:
 
 ```bash
-mneme codex-hook-capture --input - --event Stop --output .local/mneme-codex-hooks.jsonl
-mneme codex-hook-validate --input .local/mneme-codex-hooks.jsonl
+mneme-codex codex-hook-capture --input - --event Stop --output .local/mneme-codex-hooks.jsonl
+mneme-codex codex-hook-validate --input .local/mneme-codex-hooks.jsonl
 ```
 
 The current hook contract example is

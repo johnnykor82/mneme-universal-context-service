@@ -11,6 +11,8 @@ from mneme_service.app import create_app
 from mneme_service.config import Settings
 
 EXPECTED_TOOL_NAMES = (
+    "resolve_session",
+    "list_sessions",
     "context_search",
     "fetch_event",
     "expand_context",
@@ -130,6 +132,7 @@ async def parity_clients(tmp_path: Path) -> tuple[httpx.AsyncClient, Any]:
 def test_mcp_server_module_imports() -> None:
     from mneme_service.mcp_server import TOOL_NAMES, create_mcp_server
 
+    assert "resolve_session" in TOOL_NAMES
     assert "context_search" in TOOL_NAMES
     assert "mneme_cost_report" in TOOL_NAMES
     assert create_mcp_server is not None
@@ -199,11 +202,64 @@ def test_mcp_context_search_tool_proxies_rest_envelope() -> None:
     assert result["trace_id"] == "trace-1"
 
 
+def test_mcp_resolve_session_tool_proxies_rest_envelope() -> None:
+    from mneme_service.mcp_server import create_mcp_server
+
+    seen: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["body"] = request.content.decode("utf-8")
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "data": {"resolved_session_id": "codex-session-1", "matches": []},
+                "warnings": [],
+            },
+        )
+
+    server = create_mcp_server(base_url="http://mneme.test/", transport=httpx.MockTransport(handler))
+
+    result = structured_tool_result(
+        asyncio.run(
+            server.call_tool(
+                "resolve_session",
+                {"project_path": "/repo/rlm-orchestrator", "thread_id": "thread-1", "limit": 3},
+            )
+        )
+    )
+
+    assert seen["url"] == "http://mneme.test/v1/tools/resolve_session"
+    assert json.loads(seen["body"]) == {
+        "session_id": None,
+        "project_path": "/repo/rlm-orchestrator",
+        "thread_id": "thread-1",
+        "slug": None,
+        "query": None,
+        "limit": 3,
+    }
+    assert result["ok"] is True
+    assert result["data"]["resolved_session_id"] == "codex-session-1"
+
+
 def test_mcp_rest_memory_tool_parity(tmp_path: Path) -> None:
     async def scenario() -> None:
         http, server = await parity_clients(tmp_path)
         async with http:
             await seed_mcp_parity_session(http)
+
+            resolve_payload = {"session_id": "session-1"}
+            rest_resolve = (await http.post("/v1/tools/resolve_session", json=resolve_payload)).json()
+            mcp_resolve = await mcp_call(server, "resolve_session", resolve_payload)
+            assert rest_resolve["data"]["resolved_session_id"] == mcp_resolve["data"]["resolved_session_id"]
+
+            list_payload = {"query": "project-1", "limit": 10}
+            rest_list = (await http.post("/v1/tools/list_sessions", json=list_payload)).json()
+            mcp_list = await mcp_call(server, "list_sessions", list_payload)
+            assert [item["session_id"] for item in rest_list["data"]["sessions"]] == [
+                item["session_id"] for item in mcp_list["data"]["sessions"]
+            ]
 
             search_payload = {"query": "assembler failure", "session_id": "session-1", "scope": "SESSION", "top_k": 5}
             rest_search = (await http.post("/v1/tools/context_search", json=search_payload)).json()

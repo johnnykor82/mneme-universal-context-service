@@ -5,8 +5,8 @@ This checklist gates public GitHub publication.
 ## Required Before Public Release
 
 - [x] Select and add a license.
-- [x] Decide whether `adapters/codex` remains in this repository or becomes a
-  separate package/repository.
+- [x] Decide whether `adapters/codex` remains in the public engine repository
+  or becomes a separate package/repository.
 - [x] Confirm README claims match implemented behavior.
 - [x] Confirm Codex docs say MCP is tools-only and does not automatically
   replace Codex prompt context.
@@ -36,40 +36,61 @@ This checklist gates public GitHub publication.
 - [x] For multi-machine Codex use, confirm setup docs distinguish shared
   symlinked files from per-machine runtime installation, daemon, MCP, token,
   database, and hook trust steps.
-- [x] After local hook validation, publish Mneme plus the Codex adapter to the
-  user's GitHub.
-- [ ] Run a second-machine install rehearsal from GitHub as a new-user flow.
+- [x] Quarantine the first mixed engine/adapter/internal publication as private.
+- [x] Publish clean Mneme engine/core repository
+  `johnnykor82/mneme-universal-context-service` without host-specific adapters
+  or internal planning/dogfood artifacts.
+- [x] Publish separate Codex adapter repository/package
+  `johnnykor82/mneme-codex-adapter`.
+- [x] Add a Codex Desktop global quickstart and token-safe setup/doctor/status
+  commands for the next second-machine rehearsal.
+- [ ] Run a second-machine install rehearsal from the clean public engine and
+  adapter repositories as a new-user flow.
 
 ## License Gate
 
 The project owner selected Apache License 2.0. `LICENSE` and `NOTICE` identify
 Ivan Konstantinov as the 2026 copyright owner.
 
-## Codex Adapter Scope
+## Repository Split Scope
 
-`adapters/codex` remains in this repository for the first public-prep pass. A
-separate adapter package or repository should wait until the adapter has a
-stable live ingestion path or a host lifecycle integration beyond MCP tools.
+Public release must keep Mneme engine/core separate from host adapters. The
+engine/core repository should contain the daemon, storage, REST/MCP service,
+provider interfaces, context preparation, and runtime-neutral tests/docs. Codex
+hook code, Codex skills, AGENTS snippets, and Codex setup docs belong in a
+separate Codex adapter repository/package.
+
+Chosen GitHub repository names:
+
+- Core engine: `johnnykor82/mneme-universal-context-service`.
+- Codex adapter: `johnnykor82/mneme-codex-adapter`.
 
 Codex adapter docs and examples should be written as future user-facing install
 material: prefer package-relative commands, placeholders for secrets, explicit
 trust steps for hooks, and local dogfood paths only in files clearly marked as
 dogfood-only.
 
-## Post-Hook Publication Gate
+## Split Publication Gate
 
 Do not publish the Codex hook adapter path as ready before trusted local hook
-payload validation succeeds on this machine.
+payload validation succeeds on this machine. Do not publish internal planning,
+dogfood prompts, local rehearsal files, or machine-specific notes as public
+install artifacts.
 
-After local hook validation:
+Corrected publication sequence:
 
-- publish Mneme plus `adapters/codex` to the user's GitHub:
-  `https://github.com/johnnykor82/mneme-universal-context-service`;
-- install on the second Codex machine from GitHub as if the installer were a
-  new user, not by relying on shared symlinked files;
-- verify `mneme serve`, `mneme mcp`, auth token/env, database path, provider
-  secrets if used, MCP visibility, hook trust, `mneme codex-hook-capture`,
-  `mneme codex-hook-validate`, and a REST-ingestion plus MCP-recall smoke path;
+- keep the first mixed repository private/quarantined;
+- publish clean `johnnykor82/mneme-universal-context-service` as the Mneme
+  engine/core repository;
+- publish separate `johnnykor82/mneme-codex-adapter` as the Codex adapter
+  repository/package;
+- install both on the second Codex machine from GitHub as if the installer were
+  a new user, not by relying on shared symlinked files;
+- verify `mneme-codex setup codex-desktop --global`, `mneme-codex doctor`,
+  `mneme serve`, `mneme mcp`, auth token/env, database path, provider secrets
+  if used, MCP visibility, hook trust, `mneme-codex codex-hook-capture`,
+  `mneme-codex codex-hook-validate`, and a REST-ingestion plus MCP-recall smoke
+  path;
 - record any missing setup step before calling the publication path ready.
 
 ## Honest Claims

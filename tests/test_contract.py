@@ -30,7 +30,14 @@ def approx_tokens(value: str) -> int:
     return max(1, (len(value) + 3) // 4) if value else 0
 
 
-def start_session(api: TestClient, session_id: str = "session-1", runtime: str = "HERMES") -> None:
+def start_session(
+    api: TestClient,
+    session_id: str = "session-1",
+    runtime: str = "HERMES",
+    *,
+    project_id: str = "project-1",
+    metadata: dict | None = None,
+) -> None:
     response = api.post(
         "/v1/sessions/start",
         headers=auth_headers(),
@@ -39,15 +46,15 @@ def start_session(api: TestClient, session_id: str = "session-1", runtime: str =
             "session_id": session_id,
             "agent_id": "agent-1",
             "runtime": runtime,
-            "project_id": "project-1",
+            "project_id": project_id,
             "model": "test-model",
             "tokenizer": "approx",
             "context_window_tokens": 100000,
             "cost_mode": "STANDARD",
             "started_at": "2026-06-09T12:00:00Z",
-            "metadata": {"cwd": "/repo"},
+            "metadata": metadata if metadata is not None else {"cwd": "/repo"},
             "privacy": {
-                "project_isolation_key": "project-1",
+                "project_isolation_key": project_id,
                 "retention_days": 30,
                 "redaction_profile": "DEFAULT",
                 "redaction_policy": "IRREVERSIBLE",
@@ -159,6 +166,56 @@ def test_event_ingestion_redaction_duplicate_conflict_and_unknown_session(tmp_pa
     assert payload["ok"] is True
     assert "sk-test-secret" not in str(payload)
     assert "[REDACTED]" in str(payload)
+
+
+def test_session_discovery_resolves_codex_session_without_guessing(tmp_path: Path) -> None:
+    api = client(tmp_path)
+    project_path = "/repo/rlm-orchestrator"
+    start_session(
+        api,
+        session_id="019ec6c0-65a9-7bf3-9faa-830730a560c5",
+        runtime="CODEX",
+        project_id=project_path,
+        metadata={"cwd": project_path, "thread_id": "thread-rlm-1", "source": "codex_hook"},
+    )
+
+    listed = api.post(
+        "/v1/tools/list_sessions",
+        headers=auth_headers(),
+        json={"query": "rlm-orchestrator", "limit": 5},
+    )
+    assert listed.status_code == 200, listed.text
+    sessions = listed.json()["data"]["sessions"]
+    assert [item["session_id"] for item in sessions] == ["019ec6c0-65a9-7bf3-9faa-830730a560c5"]
+    assert sessions[0]["metadata"]["cwd"] == project_path
+
+    by_project = api.post(
+        "/v1/tools/resolve_session",
+        headers=auth_headers(),
+        json={"project_path": project_path},
+    )
+    assert by_project.status_code == 200, by_project.text
+    assert by_project.json()["data"]["resolved_session_id"] == "019ec6c0-65a9-7bf3-9faa-830730a560c5"
+
+    by_thread = api.post(
+        "/v1/tools/resolve_session",
+        headers=auth_headers(),
+        json={"thread_id": "thread-rlm-1"},
+    )
+    assert by_thread.status_code == 200, by_thread.text
+    assert by_thread.json()["data"]["resolved_session_id"] == "019ec6c0-65a9-7bf3-9faa-830730a560c5"
+
+    guessed = api.post(
+        "/v1/tools/get_execution_state",
+        headers=auth_headers(),
+        json={"session_id": "rlm-orchestrator"},
+    )
+    assert guessed.status_code == 404
+    details = guessed.json()["error"]["details"]
+    assert details["session_id"] == "rlm-orchestrator"
+    assert details["reason"] == "SESSION_ID_NOT_FOUND"
+    assert details["discovery_tools"] == ["resolve_session", "list_sessions"]
+    assert details["candidate_sessions"][0]["session_id"] == "019ec6c0-65a9-7bf3-9faa-830730a560c5"
 
 
 def test_oversized_inline_rejected_and_bytes_ref_accepted(tmp_path: Path) -> None:

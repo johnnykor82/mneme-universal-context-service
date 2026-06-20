@@ -161,6 +161,8 @@ These mirror MCP tools so non-MCP runtimes can use the same memory operations.
 
 | Method | Path | Purpose |
 |---|---|---|
+| `POST` | `/v1/tools/resolve_session` | Resolve a known id, project path, thread id, slug, or query into a valid internal session id. |
+| `POST` | `/v1/tools/list_sessions` | List bounded session summaries for discovery and ambiguity resolution. |
 | `POST` | `/v1/tools/context_search` | Search prior events/segments. |
 | `POST` | `/v1/tools/fetch_event` | Fetch raw event evidence. |
 | `POST` | `/v1/tools/expand_context` | Expand from an event through causal, temporal, tool-chain, or segment edges. |
@@ -1228,6 +1230,109 @@ Failure:
 }
 ```
 
+### `resolve_session`
+
+Purpose: find a valid internal Mneme `session_id` before calling
+session-bound memory tools. Agents must use this tool when the user or host has
+not supplied a trusted session id.
+
+Input:
+
+```json
+{
+  "session_id": null,
+  "project_path": "/repo/my-project",
+  "thread_id": "codex-thread-id",
+  "slug": "my-project",
+  "query": "my project",
+  "limit": 10
+}
+```
+
+At least one of `session_id`, `project_path`, `thread_id`, `slug`, or `query`
+must be supplied. If `session_id` exists exactly, resolution should return it
+without requiring a search.
+
+Output data:
+
+```json
+{
+  "resolved_session_id": "session-123",
+  "resolution": "SINGLE_MATCH",
+  "matches": [
+    {
+      "session_id": "session-123",
+      "agent_id": "codex",
+      "runtime": "CODEX",
+      "project_id": "/repo/my-project",
+      "started_at": "2026-06-20T12:00:00Z",
+      "created_at_ms": 1781966400000,
+      "metadata": {
+        "cwd": "/repo/my-project",
+        "thread_id": "codex-thread-id"
+      },
+      "event_count": 42,
+      "turn_count": 8,
+      "latest_event_timestamp": "2026-06-20T12:30:00Z"
+    }
+  ]
+}
+```
+
+Resolution values:
+
+- `EXACT_SESSION_ID`
+- `SINGLE_MATCH`
+- `AMBIGUOUS`
+- `NOT_FOUND`
+
+`AMBIGUOUS` and `NOT_FOUND` are recoverable tool outcomes and should return
+`ok=true` with warnings, not transport-level failures.
+
+### `list_sessions`
+
+Purpose: list bounded session summaries for discovery and ambiguity resolution.
+This tool is for selecting a valid session id, not for reading event content.
+
+Input:
+
+```json
+{
+  "query": "my-project",
+  "project_path": "/repo/my-project",
+  "thread_id": null,
+  "slug": null,
+  "limit": 20
+}
+```
+
+Output data:
+
+```json
+{
+  "sessions": [
+    {
+      "session_id": "session-123",
+      "agent_id": "codex",
+      "runtime": "CODEX",
+      "project_id": "/repo/my-project",
+      "started_at": "2026-06-20T12:00:00Z",
+      "metadata": {
+        "cwd": "/repo/my-project"
+      },
+      "event_count": 42,
+      "turn_count": 8,
+      "latest_event_timestamp": "2026-06-20T12:30:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+Session summaries must be bounded and redacted. They should expose only fields
+needed to identify the right session, such as `session_id`, runtime, project id,
+safe adapter metadata, counts, and latest event timestamp.
+
 ### `context_search`
 
 Purpose: find relevant events and segments.
@@ -1570,6 +1675,21 @@ HTTP mapping:
 | 503 | `PROVIDER_UNAVAILABLE` | Optional embedding/rerank/enrichment provider unavailable. |
 | 500 | `INTERNAL_ERROR` | Unexpected service failure. |
 
+For missing sessions, `details` should distinguish an actually unknown internal
+id from an agent-supplied alias/slug by returning at least:
+
+```json
+{
+  "session_id": "rlm-orchestrator",
+  "reason": "SESSION_ID_NOT_FOUND",
+  "hint": "Do not guess Mneme session_id. Call resolve_session with project_path/thread_id/slug or list_sessions to find a valid session.",
+  "discovery_tools": ["resolve_session", "list_sessions"],
+  "candidate_sessions": []
+}
+```
+
+`candidate_sessions` must be bounded and redacted.
+
 Idempotency rules:
 
 - Duplicate `event_id` with identical payload returns success and increments `duplicates`.
@@ -1817,9 +1937,12 @@ control over Codex internal prompt assembly.
 
 v0 strategy:
 
-- Provide an MCP server with `context_search`, `fetch_event`, `expand_context`,
-  `list_segments`, `get_execution_state`, `get_goal_history`, `recall_recent`,
+- Provide an MCP server with `resolve_session`, `list_sessions`,
+  `context_search`, `fetch_event`, `expand_context`, `list_segments`,
+  `get_execution_state`, `get_goal_history`, `recall_recent`,
   `explain_context`, and `mneme_cost_report`.
+- Teach agents to call `resolve_session` or `list_sessions` before
+  session-bound tools when the valid internal Mneme `session_id` is unknown.
 - Package Codex plugin/skill guidance that teaches when to call Mneme tools.
 - Use feature-detected session/turn logging hooks only where available.
 - Do not claim automatic context replacement unless a runtime exposes a supported hook.

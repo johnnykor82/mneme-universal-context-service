@@ -75,6 +75,8 @@ Restart Codex so the new MCP server is loaded. Then send the prompt from `adapte
 
 The new Codex session should see Mneme memory tools, usually under an MCP namespace for `mneme`:
 
+- `resolve_session`
+- `list_sessions`
 - `context_search`
 - `fetch_event`
 - `expand_context`

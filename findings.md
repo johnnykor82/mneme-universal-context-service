@@ -12,10 +12,11 @@
 - Future public GitHub publication remains a product constraint: installation
   and adapter setup should be clear, automatable where possible, and free of
   hidden dependencies on this workstation's private paths.
-- GitHub publication of Mneme plus the Codex adapter should happen after local
-  trusted Codex hook validation and Phase 14C full original-core parity
-  completion, then be tested immediately on the user's second Codex machine as a
-  new-user installation from GitHub.
+- GitHub publication must split the product into separate install surfaces:
+  the Mneme engine/core repository first, then host-specific adapter
+  repositories/packages such as a Codex adapter. Internal planning, dogfood
+  prompts, local rehearsal files, and machine-specific notes should not be
+  published as user-facing install artifacts.
 - The user runs two Codex installs on different machines with shared files via
   symlinks. Mneme docs/installers must treat runtime setup as per-machine:
   daemon, MCP config, tokens, database, provider secrets, and hook trust do not
@@ -31,6 +32,41 @@
 - Runtime-neutral session/topic drift semantics are daemon scope, not Hermes-adapter-only scope. Host adapters supply lifecycle metadata; the daemon decides segment drift, resume/fresh-session behavior, lineage/carry-over, and first-turn resume context fill.
 
 ## Research Findings
+
+### RLM Orchestrator Proposal Findings
+
+- RLM Orchestrator should be treated as a separate product/repository, not as
+  part of Mneme core. Mneme remains independently useful and becomes the
+  required memory/evidence backend for the orchestrator.
+- The orchestrator's core boundary is read-oriented: it can read Mneme, local
+  files, git, controlled terminal output, read-only database query results,
+  web/SearX MCP output, and external MCP knowledge sources. It must not modify
+  project files, git state, user databases, configs, or external systems.
+- The orchestrator may write only its own bounded run state under its own
+  workspace directory. This is required from MVP 1 for progress visibility,
+  crash recovery, deterministic resume, and auditability.
+- All source adapters should be capability-gated and read-only by default.
+  Source content is evidence, not instruction authority.
+- Proposed MVP sequence: design/contract; read-only local+Mneme core;
+  recursive workers/verifier/progress/resume; controlled terminal plus
+  read-only DB access through command templates; web and external MCP knowledge
+  sources; external agent interfaces; comparative benchmarks.
+- A development spec for architecture review is recorded in
+  `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md`.
+- Architecture review feedback identified three MVP 1 blockers that are now
+  resolved in the v0.2 draft: model/provider configuration is explicit through
+  an OpenAI-compatible/LiteLLM-friendly provider contract, MVP 1 uses a
+  deterministic static planner instead of model-driven decomposition, and
+  Mneme is a hard dependency that fails closed at run start.
+- The v0.2 draft also tightens secret redaction, first-class evidence
+  freshness, shared budget reservations for future parallel workers,
+  self-reported confidence naming, loop prevention through task hashes, and
+  baseline quality criteria for MVP 1.
+- Follow-up review approved v0.2 for MVP 1. The v0.3 draft adds non-blocking
+  refinements before implementation planning: `CONFIGURE_ME` model placeholder,
+  deterministic static subtemplates, automated MVP 1 baseline comparison,
+  cancellation semantics before MVP 2 parallel workers, and removal of the
+  vague fast-path phrase "narrow lookup".
 
 ### Current Mneme Prototype Facts
 
@@ -159,15 +195,55 @@
   symlinked AGENTS/skill/doc tree can remind both Codex installs to use Mneme,
   but each machine still needs its own working `mneme serve`, `mneme mcp`, local
   env vars/tokens, database path, and trusted hook setup.
-- The next publication step is intentionally ordered after local hook
-  validation and Phase 14C full parity completion: publish the repository and
-  Codex adapter to the user's GitHub, then rehearse a second-machine install
-  from GitHub as if by a new user. This catches missing installer steps that
-  shared symlinks would otherwise hide.
-- The current project directory is not itself a git repository
-  (`git rev-parse --show-toplevel` fails). The post-hook publication gate must
-  therefore include creating/choosing a repository and remote before pushing to
-  the user's GitHub.
+- The first GitHub publication step accidentally mixed engine, Codex adapter,
+  and internal planning/dogfood material in one repository. That repository was
+  made private and should be treated as quarantine/internal, not as the public
+  install source.
+- The corrected publication path is: create a clean public Mneme engine/core
+  repository, create a separate Codex adapter repository/package that depends
+  on the core, then rehearse installation on the second Codex machine from
+  those public surfaces as if by a new user.
+- The chosen GitHub names are `johnnykor82/mneme-universal-context-service` for
+  the Mneme engine/core and `johnnykor82/mneme-codex-adapter` for the Codex
+  adapter.
+- Clean core publication is complete. The public core repository
+  `johnnykor82/mneme-universal-context-service` was recreated from sanitized
+  root commit `01f969d`, while the earlier mixed repository was preserved as
+  private `johnnykor82/mneme-universal-context-service-internal-quarantine`
+  because the GitHub token did not have `delete_repo` scope.
+- Clean Codex adapter publication is complete. The public adapter repository
+  `johnnykor82/mneme-codex-adapter` was created from sanitized root commit
+  `d041528` and uses the `mneme-codex` CLI while depending on the public core.
+- The second-machine install rehearsal succeeded technically, but it was a
+  developer alpha path: local clone, workspace `.venv`, manual daemon process,
+  manual MCP distinction, and no always-clear global Codex operating model.
+  The feedback recommends a linear Codex Desktop quickstart, explicit install
+  scope, daemon/service story, MCP registration guidance, hook state ladder,
+  doctor/status commands, safe uninstall/reinstall guidance, and copyable smoke
+  tests.
+- The first packaging response is intentionally narrow: add a user-global
+  install root (`~/.mneme-codex`), token-safe generated runtime files,
+  `mneme-codex setup codex-desktop --global`, `mneme-codex doctor/status`,
+  sample transcript smoke input that does not require a source checkout, and a
+  Codex Desktop quickstart. It does not silently edit Codex config, install a
+  background service, enable write hooks, or claim automatic prompt
+  replacement.
+- The second global-install feedback showed that the public adapter needed one
+  more usability pass before another rehearsal: sample ingest needed
+  install-root token resolution, daemon startup needed a launchd service path,
+  doctor/status needed install-root entrypoint checks, public docs needed to
+  avoid references to unpublished skills, and provider setup needed explicit
+  non-secret config/API-key/restart/verify instructions.
+- The Codex adapter public commit `47a2127` closes that pass: it adds
+  `mneme-codex service install/start/stop/status/logs/uninstall`, writes
+  `$MNEME_CODEX_HOME/mneme.toml`, resolves REST command tokens from
+  `$MNEME_CODEX_HOME/.local/mneme.env` when `--install-root` is supplied, and
+  reports `provider_capabilities` in doctor/status without printing secrets.
+- The follow-up public commit `2a76286` closes the remaining skill-install
+  gap: `mneme-memory` is packaged with the adapter, `mneme-codex skill install`
+  writes it to `~/.codex/skills` or a symlinked shared skills target, and
+  install docs now mark the skill as required for expected Codex recall
+  behavior in fresh/resumed/compacted sessions.
 - `codex doctor --summary --ascii` for this project did not surface a hook
   config parse error, but it reported unrelated environment issues: Codex state
   database integrity failure, provider reachability/WebSocket failures, optional
@@ -480,9 +556,9 @@
 - Secret and overclaim scans found no real tokens. Matches were either
   placeholder-only examples such as `<secret>` or negative/honesty statements
   warning that MCP does not automatically replace a host prompt.
-- `adapters/codex` remains in this repository for the first public-prep pass.
-  A separate adapter package should wait until the Codex path has live ingestion
-  or a deeper host lifecycle integration beyond tools-only MCP.
+- The earlier decision to keep `adapters/codex` in the same first public
+  repository was wrong for the desired product shape. The durable public model
+  is engine/core separately and host adapters separately.
 - Ivan Konstantinov selected Apache License 2.0. `LICENSE` and `NOTICE` now
   identify Ivan Konstantinov as the 2026 copyright owner.
 
@@ -580,11 +656,46 @@
 | Parity recovery should precede further Codex dogfood polish. | A useful Codex memory should dogfood semantic/execution-state retrieval, not only keyword/recency reads over persisted events. |
 | Port `hermes-mneme` behavior before adapter work. | Adapters should validate and expose a mature context engine, not compensate for missing daemon features. |
 | Generic session/topic drift is daemon behavior; hook plumbing is adapter behavior. | Every runtime needs topic-switch detection and resume/carry-over memory semantics, but each runtime exposes session ids and request hooks differently. |
-| `adapters/codex` stays in-repo for the first publication pass. | The current adapter is a reference tools-only/offline-ingestion path; splitting it now would add packaging overhead before the integration surface stabilizes. |
+| First mixed GitHub publication is quarantined private. | It combined engine, Codex adapter, and internal planning/dogfood material. Public release must use a clean core/adapters split. |
 | Publish under Apache License 2.0. | Ivan Konstantinov selected Apache-2.0 for permissive commercial adoption with explicit patent terms. |
 | Defer Hermes adapter implementation until upstream native context-engine hooks land. | A compaction-based bridge would be throwaway work and could force duplicated integration effort after the PR is accepted. |
 | Treat public installability as a continuing design constraint after Phase 15. | Future users should be able to install Mneme and its adapters from GitHub with understandable automated steps, so docs/examples must avoid local-only assumptions. |
+| Prefer `mneme-codex service` over `nohup` for macOS global Codex installs. | The second-machine rehearsal showed `nohup` could exit from the agent/tool environment, while a user LaunchAgent gives a durable per-account daemon lifecycle. |
+| Global Codex adapter REST commands should support install-root token discovery. | A new user should not have to source `.local/mneme.env` manually for sample ingest, hook replay, or context-preview smoke after running setup. |
+| Treat `mneme-memory` as a required Codex operating skill, not a hidden context hook. | The skill teaches Codex when to call Mneme MCP tools, while MCP remains tools-only and does not automatically replace prompt context. |
 | Treat pre-Phase-14 comparison entries as historical audit data. | The old comparison remains valuable for rationale, but current status must be read from the new post-Phase-14 section. |
+| Add MCP session discovery before session-bound memory tools. | Codex agents were guessing `session_id` values such as `default` or repo slugs because MCP exposed only tools that required an already-known internal id. `resolve_session` and `list_sessions` make discovery explicit and keep session-bound tools strict. |
+
+## Phase 13B Session Discovery Findings
+
+- Root cause: Mneme MCP exposed `context_search`, `fetch_event`,
+  `expand_context`, `recall_recent`, `list_segments`,
+  `get_execution_state`, `get_goal_history`, `explain_context`, and
+  `mneme_cost_report`, all of which either required a valid internal
+  `session_id` directly or depended on a trace/session that already existed.
+  It did not expose a way for the agent to discover valid sessions.
+- `session_id="default"` and `session_id="rlm-orchestrator"` correctly
+  returned `NOT_FOUND`; those are aliases/slugs, not internal Mneme session ids.
+- Existing storage already has enough data for discovery without schema
+  migration: the `sessions.data` JSON includes `session_id`, `project_id`,
+  runtime/agent metadata, and Codex hook/importer metadata such as `cwd` and
+  optional `thread_id`.
+- The global local Codex installation uses
+  `/Users/openclaw/.mneme-codex/.local/mneme.db` and `127.0.0.1:8765`; it is
+  separate from the repo-local dogfood database `.local/mneme-dogfood.db` on
+  port `8767`.
+- Events are being written in the global local Codex database: inspection found
+  7 sessions and 947 non-memory-read events.
+- The real `_rlm-orchestrator` session in the global local database is
+  `019edb86-1d22-78a3-b9e4-e6121c294056`, with project/cwd
+  `/Users/openclaw/Documents/_rlm-orchestrator`.
+- Live MCP reads succeed with that real session id; `get_execution_state`
+  returned `ok=true`, and `context_search` found RLM Orchestrator task/README
+  evidence.
+- Operational caveat: the running Codex MCP uses the installed
+  `mneme-context-service` wheel in `/Users/openclaw/.mneme-codex/.venv`. Source
+  changes in this repo will not appear in current Codex MCP tools until the
+  package is reinstalled/published and Codex/MCP is restarted.
 
 ## Issues Encountered
 

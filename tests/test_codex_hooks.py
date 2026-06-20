@@ -666,12 +666,12 @@ def test_codex_hook_capture_example_is_capture_only_and_publication_friendly() -
     assert meta["status"] == "capture_only"
     assert meta["writes_enabled"] is False
     assert meta["output_path"] == ".local/mneme-codex-hooks.jsonl"
-    assert "mneme codex-hook-validate --input .local/mneme-codex-hooks.jsonl" in meta["next_command"]
+    assert "mneme-codex codex-hook-validate --input .local/mneme-codex-hooks.jsonl" in meta["next_command"]
 
     for event_name in ("SessionStart", "UserPromptSubmit", "PostCompact", "PostToolUse", "Stop"):
         assert event_name in config["hooks"]
         command = config["hooks"][event_name][0]["hooks"][0]["command"]
-        assert "mneme codex-hook-capture" in command
+        assert "mneme-codex codex-hook-capture" in command
         assert "--input -" in command
         assert "--output .local/mneme-codex-hooks.jsonl" in command
         assert "codex-hook-ingest" not in command
@@ -684,11 +684,11 @@ def test_codex_hooks_usage_doc_keeps_auto_write_disabled_until_verified() -> Non
     guide = Path("adapters/codex/MNEME_CODEX_HOOKS_USAGE.md").read_text(encoding="utf-8")
     lower = guide.lower()
 
-    assert "mneme codex-hook-ingest --input hook.json --event stop --dry-run" in lower
-    assert "mneme codex-hook-capture --input - --event stop --output .local/mneme-codex-hooks.jsonl" in lower
-    assert "mneme codex-hook-validate --input .local/mneme-codex-hooks.jsonl" in lower
-    assert "mneme codex-hook-import-capture" in lower
-    assert "mneme codex-hook-prepare-preview" in lower
+    assert "mneme-codex codex-hook-ingest --input hook.json --event stop --dry-run" in lower
+    assert "mneme-codex codex-hook-capture --input - --event stop --output .local/mneme-codex-hooks.jsonl" in lower
+    assert "mneme-codex codex-hook-validate --input .local/mneme-codex-hooks.jsonl" in lower
+    assert "mneme-codex codex-hook-import-capture" in lower
+    assert "mneme-codex codex-hook-prepare-preview" in lower
     assert "codex-hook-render-context-preview-config" in lower
     assert "codex prompt injection is" in lower
     assert "not supported by current command hooks" in lower

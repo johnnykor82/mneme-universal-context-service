@@ -100,7 +100,7 @@ def create_app(
 
     def require_session(session_id: str) -> None:
         if not store.has_session(session_id):
-            raise not_found("Session not found.", session_id=session_id)
+            raise not_found("Session not found.", **session_not_found_details(store, session_id))
 
     @app.get("/v1/health")
     async def health() -> dict[str, Any]:
@@ -507,6 +507,69 @@ def create_app(
             "cost_estimate": {"embedding_calls": 0, "reranker_calls": 0, "enrichment_calls": 0},
         }
 
+    @app.post("/v1/tools/resolve_session")
+    async def resolve_session(payload: dict[str, Any], _auth: None = Depends(require_auth)) -> dict[str, Any]:
+        limit = parse_int(payload, "limit", default=10, minimum=1, maximum=50)
+        session_id = optional_payload_str(payload, "session_id")
+        project_path = optional_payload_str(payload, "project_path")
+        thread_id = optional_payload_str(payload, "thread_id")
+        slug = optional_payload_str(payload, "slug")
+        query = optional_payload_str(payload, "query")
+        if not any([session_id, project_path, thread_id, slug, query]):
+            raise validation_error(
+                "resolve_session requires session_id, project_path, thread_id, slug, or query.",
+                field="session_id",
+            )
+
+        exact = store.get_session_summary(session_id) if session_id and store.has_session(session_id) else None
+        if exact:
+            return tool_response(
+                {
+                    "resolved_session_id": exact["session_id"],
+                    "resolution": "EXACT_SESSION_ID",
+                    "matches": [exact],
+                }
+            )
+
+        search_query = query or session_id
+        matches = store.list_sessions(
+            query=search_query,
+            project_path=project_path,
+            thread_id=thread_id,
+            slug=slug,
+            limit=limit,
+        )
+        resolved_session_id = matches[0]["session_id"] if len(matches) == 1 else None
+        if resolved_session_id:
+            resolution = "SINGLE_MATCH"
+            warnings: list[dict[str, Any]] = []
+        elif matches:
+            resolution = "AMBIGUOUS"
+            warnings = [{"code": "AMBIGUOUS_SESSION", "message": "Multiple sessions matched; pass a more specific session_id, thread_id, or project_path."}]
+        else:
+            resolution = "NOT_FOUND"
+            warnings = [{"code": "SESSION_NOT_FOUND", "message": "No session matched; check that REST/importer/hooks write to the same Mneme database as this MCP server."}]
+        return tool_response(
+            {
+                "resolved_session_id": resolved_session_id,
+                "resolution": resolution,
+                "matches": matches,
+            },
+            warnings=warnings,
+        )
+
+    @app.post("/v1/tools/list_sessions")
+    async def list_sessions(payload: dict[str, Any], _auth: None = Depends(require_auth)) -> dict[str, Any]:
+        limit = parse_int(payload, "limit", default=20, minimum=1, maximum=100)
+        sessions = store.list_sessions(
+            query=optional_payload_str(payload, "query"),
+            project_path=optional_payload_str(payload, "project_path"),
+            thread_id=optional_payload_str(payload, "thread_id"),
+            slug=optional_payload_str(payload, "slug"),
+            limit=limit,
+        )
+        return tool_response({"sessions": sessions, "count": len(sessions)})
+
     @app.post("/v1/tools/context_search")
     async def context_search(payload: dict[str, Any], _auth: None = Depends(require_auth)) -> dict[str, Any]:
         session_id = require_payload_str(payload, "session_id")
@@ -662,6 +725,26 @@ def require_payload_str(payload: dict[str, Any], field: str) -> str:
     if not isinstance(value, str) or not value:
         raise validation_error(f"Missing required field {field}.", field=field)
     return value
+
+
+def optional_payload_str(payload: dict[str, Any], field: str) -> str | None:
+    value = payload.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise validation_error(f"{field} must be a non-empty string.", field=field)
+    return value
+
+
+def session_not_found_details(store: Store, session_id: str) -> dict[str, Any]:
+    candidates = store.list_sessions(query=session_id, limit=5)
+    return {
+        "session_id": session_id,
+        "reason": "SESSION_ID_NOT_FOUND",
+        "hint": "Do not guess Mneme session_id. Call resolve_session with project_path/thread_id/slug or list_sessions to find a valid session.",
+        "discovery_tools": ["resolve_session", "list_sessions"],
+        "candidate_sessions": candidates,
+    }
 
 
 def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:

@@ -1,23 +1,245 @@
 # Progress Log: Mneme Universal Context Service
 
+## 2026-06-18 - RLM Orchestrator Architecture Review Draft
+
+- Created `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` as an architecture
+  review draft for a separate `rlm-orchestrator` product.
+- Captured the agreed boundary: orchestrator is a read-oriented information
+  source for external agents, not an actor that modifies project files,
+  databases, git state, or configs.
+- Captured the allowed write scope: bounded run-state files inside the
+  orchestrator workspace only, required from MVP 1 for resume/progress/audit.
+- Captured the phased MVP plan: design/contract, read-only local+Mneme,
+  recursion/workers/progress/resume, controlled terminal/read-only DB, web and
+  external MCP sources, external agent interface, comparative benchmarks.
+- Updated `findings.md` with the RLM Orchestrator proposal findings.
+- Incorporated architecture review feedback into spec v0.2:
+  explicit OpenAI-compatible/LiteLLM-friendly model provider config,
+  deterministic static MVP 1 planner, Mneme hard dependency/fail-closed
+  behavior, stricter redaction policy, evidence freshness, shared budget ledger,
+  self-reported confidence fields, loop prevention, and stronger MVP 1
+  quality/evidence coverage criteria.
+- Incorporated follow-up review feedback into spec v0.3: status is now
+  approved for MVP 1 planning, model config uses `CONFIGURE_ME`, fast-path
+  heuristics avoid vague "narrow lookup" wording, MVP 1 static planner has
+  deterministic subtemplates, MVP 1 includes an automated baseline comparison
+  runner, and cancellation semantics are defined before MVP 2 parallel workers.
+
 ## Current Snapshot
 
-- **Current phase:** Phase 13 - Codex memory dogfood and GitHub publication/second-machine rehearsal.
-- **Current status:** Phase 14C full Hermes-Mneme daemon/core parity completion is complete; publication is no longer blocked by original-core parity. Hermes adapter work remains deferred until upstream native context-engine hooks are accepted.
-- **Next action:** rehearse installation on the second Codex machine from the
-  public GitHub repository as a new-user setup.
-- **Active plan:** Phase 13 publication/second-machine rehearsal gate after `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md` completion.
+- **Current phase:** Phase 13 - Codex memory dogfood and corrected GitHub publication split.
+- **Current status:** Phase 14C full Hermes-Mneme daemon/core parity completion is complete; publication is no longer blocked by original-core parity. The first mixed GitHub publication was quarantined as private because it combined engine, Codex adapter, and internal planning/dogfood material. Hermes adapter work remains deferred until upstream native context-engine hooks are accepted.
+- **Next action:** rerun the second-machine install rehearsal as a user-global
+  Codex Desktop setup from the updated public Codex adapter commit `2a76286`,
+  using `mneme-codex setup`, `mneme-codex service`, `mneme-codex doctor`, and
+  provider-capability checks.
+- **Active plan:** Phase 13 publication split correction after `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md` completion.
 - **Primary source files:** `task_plan.md`, `findings.md`, `progress.md`, `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md`, `MILESTONE_4_CODEX_MEMORY_DOGFOOD_AND_PROVIDER_CONFIG_PLAN.md`, `adapters/codex/MNEME_CODEX_MCP_USAGE.md`, `API_MCP_CONTRACT_V0.md`, `MNEME_HOST_ADAPTER_CONTRACT_V0.md`.
 - **Hard constraints:** do not touch live Hermes or live `hermes-mneme`; work only in `_mneme-universal-context-service`.
-- **Publication constraint:** future GitHub users must get clear, preferably automated installation/configuration steps; avoid private local-path assumptions in reusable docs/examples.
+- **Publication constraint:** future GitHub users must get clear, preferably automated installation/configuration steps; avoid private local-path assumptions in reusable docs/examples; keep the engine/core repository separate from host adapter repositories/packages and keep internal planning/dogfood files out of public install artifacts.
 - **Publication rehearsal gate:** local real-hook validation,
   REST/context-preview smoke, real preview-hook rehearsal, MCP recall, and real
   embedding/reranker smoke now pass. Full original-core parity also passes;
-  GitHub publication plus second-machine new-user install rehearsal is the next
-  gate.
+  clean core and separate Codex adapter publication are complete; the first
+  global-install feedback polish and required skill-install polish are
+  published; second-machine new-user install rehearsal is the next gate.
 - **Multi-machine constraint:** the user has two Codex machines sharing files
   through symlinks; Mneme runtime setup must be installed and verified
   per-machine, not assumed from shared files.
+
+### Second-Machine Install Feedback Response
+
+- **Status:** first packaging response complete; superseded by the
+  `47a2127` global-install feedback polish below
+- Actions taken:
+  - Read shared feedback files:
+    `/Users/openclaw/CodexShared/mneme-install-events.md` and
+    `/Users/openclaw/CodexShared/mneme-codex-install-handoff-for-developer.md`.
+  - Confirmed the second-machine install worked as developer alpha:
+    core tests passed, adapter tests passed, daemon health worked outside
+    sandbox, ingest/search/fetch/recall/state checks worked, and no global
+    Codex config/hooks were enabled.
+  - Added `mneme_service/codex_setup.py` with a first user-global Codex Desktop
+    setup/status layer.
+  - Added CLI entries for `codex-setup codex-desktop --global`,
+    `codex-doctor`, and `codex-status` in the internal checkout. The public
+    adapter export maps these to `mneme-codex setup codex-desktop --global`,
+    `mneme-codex doctor`, and `mneme-codex status`.
+  - Added `adapters/codex/CODEX_DESKTOP_QUICKSTART.md`.
+  - Updated adapter-facing docs/examples to use `mneme-codex` commands and to
+    include a setup-generated sample transcript for smoke tests without a
+    source checkout.
+  - Kept setup token-safe: it writes `.local/mneme.env` with mode `0600`,
+    writes MCP snippets that do not include the token, does not silently edit
+    Codex config, and renders capture-only hook examples.
+- Verification:
+  - `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_codex_adapter.py -q`:
+    `10 passed`.
+  - `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_codex_adapter.py tests/test_codex_hooks.py -q`:
+    `33 passed`.
+  - `env TMPDIR=/private/tmp .venv/bin/python -m compileall -q mneme_service tests`:
+    passed.
+  - `env TMPDIR=/private/tmp .venv/bin/python -m pytest -q`:
+    `135 passed, 1 warning`.
+  - `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_parity_recovery.py -q`:
+    `5 passed, 1 warning`.
+  - Adapter public export tests with public core export on `PYTHONPATH`:
+    `30 passed`.
+  - Adapter public export compileall: passed.
+  - Core public export compileall and parity acceptance: passed.
+  - Conflict marker and trailing whitespace scans over internal/exported
+    touched files: no matches.
+  - Old public-facing `mneme codex-*` command scan: no matches outside a
+    local dogfood-only restart note.
+- Next gate:
+  - Build clean public exports, run export tests, push updated core/adapter to
+    GitHub, then ask the second agent to rerun installation using the global
+    quickstart rather than a workspace-only venv.
+
+### Updated Public Core/Adapter Publication
+
+- **Status:** complete
+- Actions taken:
+  - Updated the clean public core export with a neutral link to the separate
+    Codex adapter repository.
+  - Updated the clean public Codex adapter export with:
+    `mneme-codex setup codex-desktop --global`, `mneme-codex doctor`,
+    `mneme-codex status`, `CODEX_DESKTOP_QUICKSTART.md`, generated token-safe
+    install-root files, sample transcript smoke input, and adapter version
+    `0.1.1`.
+  - Pushed core commit `59bf507a8fc03eb68053d1bf4de2f837224b3872` to
+    `johnnykor82/mneme-universal-context-service`.
+  - Pushed adapter commit `d3ffaed1419633e5e063857905666cb273fbe7f4` to
+    `johnnykor82/mneme-codex-adapter`.
+- Verification:
+  - GitHub remote head check confirmed core `main` at `59bf507`.
+  - GitHub remote head check confirmed adapter `main` at `d3ffaed`.
+- Next gate:
+  - Ask the second agent to reinstall using
+    `adapters/codex/CODEX_DESKTOP_QUICKSTART.md` from
+    `johnnykor82/mneme-codex-adapter` and report any remaining blockers.
+
+### Codex-Agent Install Instruction File
+
+- **Status:** complete
+- Actions taken:
+  - Added a public `CODEX_AGENT_INSTALL.md` to the Codex adapter publication
+    path so users can tell their Codex agent to read one file before installing.
+  - Linked it from the adapter README and quickstart.
+  - Kept the feedback path generic; no internal shared-folder paths are
+    published.
+- Verification:
+  - Adapter export scans for conflict markers, trailing whitespace, internal
+    machine paths, shared-folder paths, and token literals: no matches.
+  - Adapter export focused setup tests: `2 passed`.
+
+### Codex Global Install Feedback Polish
+
+- **Status:** complete and published
+- Feedback addressed:
+  - Sample ingest no longer requires manual env sourcing in the global flow;
+    REST-writing commands accept `--install-root` and resolve the local token
+    from `.local/mneme.env`.
+  - Added `mneme-codex service install/start/stop/status/logs/uninstall` for
+    macOS user LaunchAgent management; docs now prefer the service route and
+    keep foreground daemon launch as troubleshooting fallback.
+  - Removed public references to an unpublished `mneme-memory` skill from the
+    Codex adapter repo docs/snippet.
+  - Clarified that the install is a user-global Mneme daemon plus Codex MCP
+    config, not a Codex Desktop marketplace plugin.
+  - `doctor/status` now report ambient PATH commands separately from
+    install-root `.venv/bin` entrypoints, plus service status and provider
+    capability booleans.
+  - Setup writes `$MNEME_CODEX_HOME/mneme.toml`; docs now show where to put
+    non-secret provider settings, where to put API keys, how to restart the
+    service, and how to verify embeddings/reranker/LLM enrichment capability.
+- Public adapter:
+  - Version bumped to `mneme-codex-adapter==0.1.2`.
+  - Published commit:
+    `47a212722e8449af9de918f86ccec04ece422759` on
+    `johnnykor82/mneme-codex-adapter`.
+- Internal sync:
+  - Mirrored setup/service/doc behavior into local `mneme_service` Codex setup
+    helpers and adapter docs so future exports do not regress.
+- Verification:
+  - Public adapter export:
+    `31 passed`; compileall passed; setup/service CLI dry-runs passed;
+    conflict marker, trailing whitespace, private-path/secret scans passed.
+  - Internal focused check:
+    `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_codex_adapter.py -q`
+    passed with `11 passed`.
+  - Internal full pytest:
+    `env TMPDIR=/private/tmp .venv/bin/python -m pytest -q`
+    passed with `136 passed, 1 warning`.
+  - Internal parity acceptance:
+    `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_parity_recovery.py -q`
+    passed with `5 passed, 1 warning`.
+  - Internal compileall:
+    `env TMPDIR=/private/tmp .venv/bin/python -m compileall -q mneme_service tests`
+    passed.
+  - Internal conflict marker and trailing whitespace scans over changed
+    Mneme/Codex/planning files: no matches.
+
+### Required Mneme Memory Skill Install Polish
+
+- **Status:** complete and published
+- New feedback read from
+  `/Users/openclaw/CodexShared/mneme-codex-global-install-feedback-20260615.md`:
+  the second agent had installed `mneme-memory` manually into shared Codex
+  skills, but public `CODEX_AGENT_INSTALL.md` did not say whether that skill
+  was required, global, shared, or optional.
+- Actions taken:
+  - Added `mneme_codex_adapter/skills/mneme-memory/SKILL.md` as package data so
+    pip-installed users do not need a source checkout to install the skill.
+  - Added `mneme-codex skill install --target-dir "$HOME/.codex/skills"`.
+  - Updated README, `CODEX_AGENT_INSTALL.md`, quickstart, and AGENTS snippet to
+    make `mneme-memory` required for the expected Codex operating behavior.
+  - Bumped public adapter version to `0.1.3`.
+- Public adapter:
+  - Published commit:
+    `2a7628631198d0938d52e05fb69a916ad604bcf4` on
+    `johnnykor82/mneme-codex-adapter`.
+- Verification:
+  - Public adapter export:
+    `33 passed`; compileall passed; `mneme-codex skill install --dry-run`
+    passed; conflict marker, trailing whitespace, and private-path/secret
+    scans passed.
+
+### Local Global Codex Mneme Enablement
+
+- **Status:** complete on this machine
+- Actions taken:
+  - Installed public `mneme-codex-adapter==0.1.3` from GitHub into
+    `/Users/openclaw/.mneme-codex/.venv` using Python 3.12 after the system
+    Python 3.9 venv proved too old.
+  - Ran `mneme-codex setup codex-desktop --global` for
+    `/Users/openclaw/.mneme-codex`.
+  - Confirmed the shared `mneme-memory` skill is installed through
+    `/Users/openclaw/.codex/skills -> /Users/openclaw/CodexShared/skills`.
+  - Copied existing dogfood embedding/reranker provider settings into the
+    global Mneme env and added local LiteLLM `default` for LLM enrichment.
+  - Installed and started macOS LaunchAgent `com.mneme.codex`.
+  - Replaced the old project-local Mneme MCP block in
+    `/Users/openclaw/.codex/config.toml` with global
+    `/Users/openclaw/.mneme-codex/bin/mneme-mcp`; backup:
+    `/Users/openclaw/.codex/config.toml.bak-mneme-global-20260615-224508`.
+  - Created global `/Users/openclaw/.codex/hooks.json` using
+    `/Users/openclaw/.mneme-codex/bin/mneme-codex-hook`, with capture, write,
+    and context-preview hooks and no token literal in hooks config.
+- Verification:
+  - `curl http://127.0.0.1:8765/v1/health`: OK.
+  - `mneme-codex service status`: `running: true`.
+  - `mneme-codex doctor`: `readiness: READY`,
+    `supports_embeddings: true`, `supports_reranking: true`,
+    `supports_llm_enrichment: true`, `requires_embeddings: true`.
+  - Synthetic global hook smoke: capture OK, write accepted 1 event, context
+    preview `changed: true`.
+  - Sample transcript ingest: accepted 2 events.
+  - Hook capture validation: `valid_for_enablement: true`.
+- Note:
+  - Existing Codex sessions do not reload MCP/hook config. A fresh Codex
+    session or Codex restart is needed, and Codex may ask once to trust the new
+    global hooks.
 
 ## Session: 2026-06-15
 
@@ -91,7 +313,7 @@
 
 ### GitHub Publication
 
-- **Status:** published; second-machine rehearsal pending
+- **Status:** first mixed publication quarantined private; clean split pending
 - Actions taken:
   - Sanitized tracked dogfood docs/progress so local bearer-token literals are
     replaced with placeholders.
@@ -106,10 +328,116 @@
   - Added `origin` as
     `git@github.com:johnnykor82/mneme-universal-context-service.git`.
   - Pushed `main` and set it to track `origin/main`.
-  - Verified GitHub reports visibility `PUBLIC` and default branch `main`.
+  - Verified GitHub initially reported visibility `PUBLIC` and default branch
+    `main`.
+  - After user review, recognized this was the wrong publication shape because
+    it combined the engine, Codex adapter, and internal planning/dogfood
+    materials in one public repository.
+  - Changed the repository visibility to `PRIVATE`; follow-up verification
+    reported `visibility: PRIVATE`.
 - Next gate:
-  - Install from GitHub on the user's second Codex machine as a new-user flow
-    and record any missing setup steps.
+  - Prepare clean split publication:
+    `johnnykor82/mneme-universal-context-service` for Mneme engine/core,
+    `johnnykor82/mneme-codex-adapter` for the Codex adapter, and no internal
+    planning/dogfood artifacts in the public install surface.
+  - Only then install from GitHub on the user's second Codex machine as a
+    new-user flow and record any missing setup steps.
+
+### Publication Split Correction
+
+- **Status:** core published; Codex adapter pending
+- Actions taken:
+  - Accepted the user's correction that internal planning/rehearsal material
+    should not be added to the public GitHub repository.
+  - Accepted the product-boundary correction that Mneme engine/core and host
+    adapters should be published separately.
+  - Verified the existing mixed GitHub repository
+    `johnnykor82/mneme-universal-context-service` is now `PRIVATE`.
+  - Updated local planning files only; no new internal planning changes were
+    pushed to GitHub.
+  - Updated the publication-gate test so docs must mention the corrected
+    `engine/core` plus separate Codex adapter split and the private quarantine.
+  - Recorded the chosen GitHub names: `johnnykor82/mneme-universal-context-service`
+    for core and `johnnykor82/mneme-codex-adapter` for Codex.
+- Verification:
+  - `gh repo view johnnykor82/mneme-universal-context-service --json nameWithOwner,url,visibility,defaultBranchRef` reported `visibility: PRIVATE`.
+  - `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_codex_adapter.py -q`: `8 passed`; includes assertions for the chosen core and Codex adapter repository names.
+  - Stale combined-publication wording scan over docs/planning/tests: no
+    matches.
+  - Conflict-marker scan on changed docs/planning/test files: no matches.
+  - Trailing-whitespace scan on changed docs/planning/test files: no matches.
+- Next gate:
+  - Prepare a clean core export for `johnnykor82/mneme-universal-context-service`
+    and a separate Codex adapter package/repository at
+    `johnnykor82/mneme-codex-adapter`.
+
+### Clean Core GitHub Publication
+
+- **Status:** complete
+- Actions taken:
+  - Built a sanitized core export at `/private/tmp/mneme-core-public-1781518935`.
+  - Excluded host adapter/internal material from the export: `adapters/codex`,
+    `.agents`, `.local`, `task_plan.md`, `findings.md`, `progress.md`,
+    milestone plans, publication checklist, Codex hook/import modules, and
+    Codex-specific tests.
+  - Sanitized export-only core files so `mneme_service.cli` contains only
+    `serve`, `mcp`, and `benchmark`, MCP server instructions are runtime-neutral,
+    and user-facing install/README docs describe adapters as separate packages.
+  - Created export root commit `01f969d Initial Mneme core engine`.
+  - Attempted to delete the old mixed GitHub repository, but GitHub rejected the
+    API call because the token lacks `delete_repo` scope.
+  - Renamed the old private mixed repository to
+    `johnnykor82/mneme-universal-context-service-internal-quarantine`.
+  - Created a new public repository at
+    `https://github.com/johnnykor82/mneme-universal-context-service` and pushed
+    the clean core root commit to `main`.
+  - Updated this local internal checkout's `origin` to the private quarantine
+    remote to avoid accidentally pushing mixed internal files to the public core
+    repository.
+- Verification:
+  - Export full pytest:
+    `env TMPDIR=/private/tmp /Users/openclaw/.hermes/plugins/_mneme-universal-context-service/.venv/bin/python -m pytest -q`: `97 passed, 1 warning`.
+  - Export parity:
+    `env TMPDIR=/private/tmp /Users/openclaw/.hermes/plugins/_mneme-universal-context-service/.venv/bin/python -m pytest tests/test_parity_recovery.py -q`: `5 passed, 1 warning`.
+  - Export compileall:
+    `env TMPDIR=/private/tmp /Users/openclaw/.hermes/plugins/_mneme-universal-context-service/.venv/bin/python -m compileall -q mneme_service tests`: passed.
+  - Export scans for Codex hook/import paths, internal planning filenames,
+    quarantine adapter repo name, conflict markers, and trailing whitespace:
+    no matches.
+  - GitHub public core verification:
+    `gh repo view johnnykor82/mneme-universal-context-service --json nameWithOwner,url,visibility,defaultBranchRef`
+    reported `visibility: PUBLIC`, default branch `main`.
+  - GitHub quarantine verification:
+    `gh repo view johnnykor82/mneme-universal-context-service-internal-quarantine --json nameWithOwner,url,visibility,defaultBranchRef`
+    reported `visibility: PRIVATE`.
+  - `git ls-remote --heads origin` in the export reported
+    `01f969d1011a715f20d7dbb4f8779b18072945ef refs/heads/main`.
+- Next gate:
+  - Prepare separate `johnnykor82/mneme-codex-adapter`, then run the
+    second-machine new-user install rehearsal using the public core plus adapter.
+
+### Clean Codex Adapter GitHub Publication
+
+- **Status:** complete
+- Actions taken:
+  - Built sanitized adapter export at `/private/tmp/mneme-codex-adapter-1781520871`.
+  - Published public repo:
+    `https://github.com/johnnykor82/mneme-codex-adapter`.
+  - Adapter root commit:
+    `d0415287b9643422cef4063e5bc2b3ba73e72a5b`.
+  - Adapter package uses `mneme-codex` CLI and depends on public core
+    `mneme-context-service @ git+https://github.com/johnnykor82/mneme-universal-context-service.git`.
+- Verification:
+  - Adapter tests with public core export on `PYTHONPATH`: `28 passed`.
+  - Adapter compileall: passed.
+  - Scans for internal paths, old `mneme codex-*` commands, `mneme_service.cli`
+    adapter commands, planning filenames, dogfood markers, conflict markers,
+    and trailing whitespace: no matches.
+  - GitHub reported `visibility: PUBLIC`, default branch `main`.
+  - Remote main points to `d0415287b9643422cef4063e5bc2b3ba73e72a5b`.
+- Next gate:
+  - Second-machine install rehearsal as a new user from the two public GitHub
+    repositories.
 
 ## Session: 2026-06-14
 
@@ -244,9 +572,9 @@
 - Actions taken:
   - Recorded that GitHub publication should happen after local trusted Codex
     hook payload validation, not before.
-  - Defined the post-validation flow: publish Mneme plus `adapters/codex` to the
-    user's GitHub, then install on the second Codex machine from GitHub as if it
-    were a new user setup.
+  - Defined an earlier post-validation flow that would have published Mneme and
+    `adapters/codex` together; this is now superseded by the corrected split
+    publication model recorded in the current snapshot.
   - Made the rehearsal explicitly check per-machine runtime pieces that shared
     symlinks cannot provide: daemon, MCP config, token/env, database path,
     provider secrets if used, hook trust, hook capture/validation, and a
@@ -1614,7 +1942,8 @@
   - Updated `pyproject.toml` with setuptools build metadata, README metadata, package discovery, classifiers, and package keywords.
   - Added `.github/workflows/ci.yml` for Python 3.11/3.12 install, full pytest, explicit parity acceptance, and compile checks.
   - Updated `.gitignore` for local caches, SQLite DBs, `.local/`, build artifacts, and egg-info artifacts.
-  - Decided `adapters/codex` remains in this repository for the first public-prep pass; a separate package should wait for stable live ingestion or deeper host integration.
+  - Earlier public-prep decision kept `adapters/codex` in this repository; this
+    is now superseded by the corrected split-publication model.
   - Confirmed docs keep Codex/MCP claims tools-only and do not claim automatic prompt replacement.
   - Confirmed provider features remain optional and disabled unless configured.
   - Added Apache-2.0 `LICENSE` and `NOTICE` with Ivan Konstantinov as the 2026 copyright owner after owner approval.
@@ -2039,6 +2368,18 @@
 | Phase 13 multi-machine final parity acceptance | `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_parity_recovery.py -q` | Parity acceptance passes after multi-machine docs | `5 passed, 1 warning` | pass |
 | Phase 13 multi-machine final compileall | `env TMPDIR=/private/tmp .venv/bin/python -m compileall -q mneme_service tests` | Exit code 0 after multi-machine docs | Passed | pass |
 | Phase 13 multi-machine final hygiene scan | `rg` conflict marker and trailing whitespace scans over changed docs/planning/test files | No conflict markers or trailing whitespace after final progress update | No matches; exit code 1 from `rg` means no matches | pass |
+| Phase 13B session discovery RED | `.venv/bin/python -m pytest tests/test_contract.py::test_session_discovery_resolves_codex_session_without_guessing tests/test_mcp_contract.py::test_tool_names_match_contract tests/test_mcp_contract.py::test_mcp_tools_are_discoverable tests/test_mcp_contract.py::test_mcp_resolve_session_tool_proxies_rest_envelope -q` before implementation | Discovery endpoints/tools are missing and existing MCP tool list lacks `resolve_session`/`list_sessions` | `4 failed`: REST 404 for `/v1/tools/list_sessions`, unknown MCP tool `resolve_session`, and tool-name mismatch | pass |
+| Phase 13B session discovery GREEN | Same focused pytest command after implementation | REST/MCP discovery tools and NOT_FOUND guidance pass | `4 passed, 1 warning` | pass |
+| Phase 13B discovery regression | `.venv/bin/python -m pytest tests/test_contract.py::test_auth_health_capabilities_and_session_idempotency tests/test_contract.py::test_session_discovery_resolves_codex_session_without_guessing tests/test_mcp_contract.py tests/test_codex_hooks.py::test_codex_hook_normalizes_real_codex_desktop_fields -q` | Capabilities, MCP contract, docs checks, and real Codex hook normalization remain compatible | `18 passed, 1 warning` | pass |
+| Phase 13B syntax check | `python3 -m py_compile mneme_service/app.py mneme_service/storage.py mneme_service/mcp_server.py mneme_service/tool_names.py` | Modified Python modules compile | Exit code 0 | pass |
+| Phase 13B global DB inspection | `sqlite3 /Users/openclaw/.mneme-codex/.local/mneme.db ...` | Verify whether Codex events are written and find real project session ids | Found 7 sessions and 947 non-memory-read events; `_rlm-orchestrator` session id is `019edb86-1d22-78a3-b9e4-e6121c294056` | pass |
+| Phase 13B live MCP read | `mcp__mneme.get_execution_state` and `mcp__mneme.context_search` with session `019edb86-1d22-78a3-b9e4-e6121c294056` | Verify current MCP can read memory when given the real internal session id | Both returned `ok=true`; search found RLM Orchestrator task/README evidence | pass |
+| Phase 13B reviewer spec doc | Created `docs/MNEME_DEVELOPMENT_SPEC.md` and linked it from `README.md` | Provide one reviewer-facing specification/index tying requirements, architecture, contracts, security, tests, and traceability together | New doc added; README links to it under Specification | pass |
+| Phase 13B API/MCP contract update | Updated `API_MCP_CONTRACT_V0.md` | Keep public contract aligned with new `resolve_session`/`list_sessions` tools and improved missing-session guidance | Contract now lists discovery endpoints/tools, schemas, Codex/MCP strategy, and `NOT_FOUND` discovery details | pass |
+| Phase 13B status test determinism fix | Updated `codex_desktop_status(service_label=...)` and `tests/test_codex_adapter.py` | Avoid false failures when the developer machine already has a real `com.mneme.codex.plist` LaunchAgent installed | Status tests can use an isolated service label | pass |
+| Phase 13B isolated status test | `.venv/bin/python -m pytest tests/test_codex_adapter.py::test_codex_status_reports_missing_daemon_without_token_leak -q` | Previously failing status test is deterministic with isolated service label | `1 passed` | pass |
+| Phase 13B full pytest | `.venv/bin/python -m pytest -q` | Entire repository test suite passes after discovery/spec/status updates | `138 passed, 1 warning` | pass |
+| Phase 13B final syntax check | `python3 -m py_compile mneme_service/app.py mneme_service/storage.py mneme_service/mcp_server.py mneme_service/tool_names.py mneme_service/codex_setup.py` | Modified Python modules compile | Exit code 0 | pass |
 
 ## Error Log
 
@@ -2063,13 +2404,14 @@
 | 2026-06-12 | `sqlite_vec` is not installed in the project `.venv`. | 1 | Verified Python cosine fallback for Task 2; left vector acceleration unexercised in this environment. |
 | 2026-06-12 | Phase 15 editable install failed under sandbox DNS while resolving build dependencies for `setuptools>=68`. | 1 | Re-ran `.venv/bin/python -m pip install -e '.[test]'` with approved escalation; editable install succeeded. |
 | 2026-06-14 | Pytest could not create temp files because the data volume had only about 116 MiB available and Python found no usable temp directory. | 1 | Inspected disk usage, removed old temporary pytest/electron/log artifacts with approved escalation, then reran tests with `TMPDIR=/private/tmp`. |
+| 2026-06-20 | Global `mneme-codex doctor/status` wrapper returned exit code 127 in the sandbox. | 1 | Inspected global config, wrapper scripts, logs, and SQLite database directly; confirmed daemon config and stored sessions without printing secrets. |
 
 ## 5-Question Reboot Check
 
 | Question | Answer |
 |---|---|
-| Where am I? | Phase 14C full Hermes-Mneme parity completion is planned after a second audit found remaining original-core gaps. |
-| Where am I going? | Next: execute `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md` before GitHub publication or second-machine install rehearsal. |
+| Where am I? | Phase 13B Codex/MCP session discovery hotfix is complete in the working tree: REST/MCP now expose `resolve_session` and `list_sessions`, and docs/skill tell agents not to guess `session_id`. |
+| Where am I going? | Next: finish full verification, review the diff, commit, and push the update to GitHub; then reinstall/restart the global Codex MCP environment so the running tools include discovery. |
 | What is the goal? | Create a vendor-neutral Mneme context service any agent runtime can integrate through a clear REST/MCP contract. |
 | What have I learned? | See `findings.md` for requirements, technical decisions, issues, resources, and open questions. |
-| What have I done? | Completed concept, architecture diagram, implementation path, API/MCP contract, Host Adapter Contract v0, Milestone 1 daemon MVP, Milestone 2 MCP substrate, Milestone 3 offline/reference Codex transcript ingestion MVP, Codex MCP dogfood setup, Phase 14 parity recovery, Phase 14B hardening, Phase 15 publication prep, Phase 13 Codex hook dogfood, and Phase 14C planning. |
+| What have I done? | Completed concept, architecture diagram, implementation path, API/MCP contract, Host Adapter Contract v0, Milestone 1 daemon MVP, Milestone 2 MCP substrate, Milestone 3 offline/reference Codex transcript ingestion MVP, Codex MCP dogfood setup, Phase 14 parity recovery, Phase 14B/14C hardening/parity, Phase 15 publication prep, Phase 13 Codex hook dogfood, and Phase 13B session discovery hotfix. |

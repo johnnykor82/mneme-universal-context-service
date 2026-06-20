@@ -20,6 +20,14 @@ RICH_SEGMENT_FIELDS = {
     "topic_tags",
 }
 
+SESSION_DISCOVERY_METADATA_KEYS = (
+    "cwd",
+    "thread_id",
+    "source",
+    "codex_hook_source",
+    "transcript_path",
+)
+
 
 def text_from_event(event: dict[str, Any] | None) -> str:
     if not event:
@@ -40,6 +48,72 @@ def goal_at_timestamp(history: list[dict[str, Any]], timestamp: str) -> str | No
 
 def strip_rich_segment_fields(segment: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in segment.items() if key not in RICH_SEGMENT_FIELDS}
+
+
+def session_matches(
+    session: dict[str, Any],
+    *,
+    query: str | None,
+    project_path: str | None,
+    thread_id: str | None,
+    slug: str | None,
+) -> bool:
+    if not any([query, project_path, thread_id, slug]):
+        return True
+    fields = session_discovery_fields(session)
+    if thread_id and normalize_match_value(thread_id) not in {normalize_match_value(value) for value in fields["thread_ids"]}:
+        return False
+    if project_path and not any(matches_text(value, project_path) for value in fields["project_paths"]):
+        return False
+    if slug and not any(matches_slug(value, slug) for value in fields["all"]):
+        return False
+    if query and not any(matches_text(value, query) for value in fields["all"]):
+        return False
+    return True
+
+
+def session_discovery_fields(session: dict[str, Any]) -> dict[str, list[str]]:
+    metadata = session.get("metadata") if isinstance(session.get("metadata"), dict) else {}
+    base_fields = [
+        session.get("session_id"),
+        session.get("agent_id"),
+        session.get("runtime"),
+        session.get("project_id"),
+        session.get("started_at"),
+    ]
+    metadata_fields = [
+        metadata.get(key)
+        for key in SESSION_DISCOVERY_METADATA_KEYS
+    ]
+    project_paths = [session.get("project_id"), metadata.get("cwd"), metadata.get("transcript_path")]
+    thread_ids = [session.get("session_id"), metadata.get("thread_id")]
+    return {
+        "all": [str(value) for value in [*base_fields, *metadata_fields] if isinstance(value, str) and value],
+        "project_paths": [str(value) for value in project_paths if isinstance(value, str) and value],
+        "thread_ids": [str(value) for value in thread_ids if isinstance(value, str) and value],
+    }
+
+
+def matches_text(value: str, needle: str) -> bool:
+    haystack = normalize_match_value(value)
+    target = normalize_match_value(needle)
+    return bool(target) and (target in haystack or haystack in target)
+
+
+def matches_slug(value: str, slug: str) -> bool:
+    target = normalize_match_value(slug)
+    if not target:
+        return False
+    candidates = {normalize_match_value(value)}
+    try:
+        candidates.add(normalize_match_value(Path(value).name))
+    except (OSError, ValueError):
+        pass
+    return any(target == candidate or target in candidate for candidate in candidates if candidate)
+
+
+def normalize_match_value(value: str) -> str:
+    return value.strip().lower()
 
 
 class Store:
@@ -194,6 +268,68 @@ class Store:
             row = conn.execute("SELECT data FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
             return json.loads(row["data"]) if row else None
 
+    def get_session_summary(self, session_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT data, created_at_ms FROM sessions WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return self.session_summary(json.loads(row["data"]), int(row["created_at_ms"]))
+
+    def list_sessions(
+        self,
+        *,
+        query: str | None = None,
+        project_path: str | None = None,
+        thread_id: str | None = None,
+        slug: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT data, created_at_ms FROM sessions ORDER BY created_at_ms DESC"
+            ).fetchall()
+        summaries: list[dict[str, Any]] = []
+        for row in rows:
+            session = json.loads(row["data"])
+            if not session_matches(
+                session,
+                query=query,
+                project_path=project_path,
+                thread_id=thread_id,
+                slug=slug,
+            ):
+                continue
+            summaries.append(self.session_summary(session, int(row["created_at_ms"])))
+            if len(summaries) >= int(limit):
+                break
+        return summaries
+
+    def session_summary(self, session: dict[str, Any], created_at_ms: int) -> dict[str, Any]:
+        session_id = str(session.get("session_id") or "")
+        metadata = session.get("metadata") if isinstance(session.get("metadata"), dict) else {}
+        safe_metadata = {
+            key: metadata[key]
+            for key in SESSION_DISCOVERY_METADATA_KEYS
+            if isinstance(metadata.get(key), str) and metadata.get(key)
+        }
+        counts = self.session_counts(session_id)
+        latest_event_timestamp = self.latest_event_timestamp(session_id)
+        return {
+            "session_id": session_id,
+            "agent_id": session.get("agent_id"),
+            "runtime": session.get("runtime"),
+            "project_id": session.get("project_id"),
+            "started_at": session.get("started_at"),
+            "created_at_ms": created_at_ms,
+            "metadata": safe_metadata,
+            "event_count": counts["event_count"],
+            "turn_count": counts["turn_count"],
+            "latest_event_timestamp": latest_event_timestamp,
+        }
+
     def put_session(self, data: dict[str, Any]) -> bool:
         session_id = data["session_id"]
         project_key = data.get("privacy", {}).get("project_isolation_key")
@@ -206,6 +342,20 @@ class Store:
                 (session_id, canonical_json(data), project_key, now_ms()),
             )
             return True
+
+    def latest_event_timestamp(self, session_id: str) -> str | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT timestamp
+                FROM events
+                WHERE session_id = ? AND is_memory_read = 0
+                ORDER BY created_at_ms DESC
+                LIMIT 1
+                """,
+                (session_id,),
+            ).fetchone()
+        return row["timestamp"] if row else None
 
     def session_counts(self, session_id: str) -> dict[str, int]:
         with self.connect() as conn:

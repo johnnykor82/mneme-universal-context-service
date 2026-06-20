@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from mneme_service.mcp_server import MNEME_MCP_INSTRUCTIONS, TOOL_NAMES, create_mcp_server
@@ -104,6 +105,7 @@ def test_codex_hook_contract_example_is_disabled_until_payloads_are_verified() -
 def test_codex_docs_capture_multi_machine_install_constraints() -> None:
     paths = [
         Path("docs/INSTALLATION.md"),
+        Path("adapters/codex/CODEX_DESKTOP_QUICKSTART.md"),
         Path("adapters/codex/MNEME_CODEX_MCP_USAGE.md"),
         Path("adapters/codex/MNEME_CODEX_HOOKS_USAGE.md"),
         Path("adapters/codex/AGENTS_MNEME_SNIPPET.md"),
@@ -116,7 +118,9 @@ def test_codex_docs_capture_multi_machine_install_constraints() -> None:
     assert "per-machine" in combined
     assert "mneme serve" in combined
     assert "mneme mcp" in combined
-    assert "mneme codex-hook-capture" in combined
+    assert "mneme-codex setup codex-desktop" in combined
+    assert "mneme-codex doctor" in combined
+    assert "mneme-codex codex-hook-capture" in combined
     assert "do not assume" in combined
 
 
@@ -136,10 +140,18 @@ def test_publication_docs_gate_github_second_machine_rehearsal() -> None:
     assert "second codex machine" in lower
     assert "second-machine install rehearsal" in lower
     assert "new-user" in lower
+    assert "engine/core" in lower
+    assert "separate codex adapter" in lower
+    assert "quarantine" in lower
+    assert "private" in lower
+    assert "johnnykor82/mneme-universal-context-service" in lower
+    assert "johnnykor82/mneme-codex-adapter" in lower
     assert "mneme serve" in lower
     assert "mneme mcp" in lower
-    assert "mneme codex-hook-capture" in lower
-    assert "mneme codex-hook-validate" in lower
+    assert "mneme-codex setup codex-desktop" in lower
+    assert "mneme-codex doctor" in lower
+    assert "mneme-codex codex-hook-capture" in lower
+    assert "mneme-codex codex-hook-validate" in lower
     assert "do not publish" in lower
     assert_no_positive_prompt_replacement_claim(
         Path("docs/PUBLICATION_CHECKLIST.md").read_text(encoding="utf-8")
@@ -179,3 +191,102 @@ def test_publication_docs_do_not_overclaim_llm_answer_synthesis() -> None:
     assert "structured llm enrichment" in combined
     assert "not a separate natural-language answer-synthesis endpoint" in combined
     assert "do not claim answer synthesis" in combined
+
+
+def test_codex_global_setup_creates_safe_runtime_files(tmp_path: Path) -> None:
+    from mneme_service.codex_setup import resolve_token, setup_codex_desktop_global
+
+    root = tmp_path / "mneme-codex"
+    result = setup_codex_desktop_global(
+        install_root=root,
+        python="/opt/mneme/bin/python",
+        base_url="http://127.0.0.1:8765",
+    )
+    serialized = json.dumps(result, sort_keys=True)
+
+    assert result["schema_version"] == "mneme.codex_setup.v0"
+    assert result["install_scope"] == "user-global"
+    assert str(root) in result["install_root"]
+    assert "MNEME_AUTH_TOKEN=" not in serialized
+    assert (root / ".local" / "mneme.env").exists()
+    assert (root / ".local" / "mneme.env").stat().st_mode & 0o077 == 0
+    assert (root / "bin" / "mneme-serve").exists()
+    assert (root / "bin" / "mneme-mcp").exists()
+    assert os.access(root / "bin" / "mneme-serve", os.X_OK)
+    assert os.access(root / "bin" / "mneme-mcp", os.X_OK)
+    assert (root / "mneme.toml").exists()
+    assert (root / "codex" / "mcp_config.toml.snippet").exists()
+    assert (root / "codex" / "hooks.capture.example.json").exists()
+    assert (root / ".local" / "mneme-codex-sample-transcript.json").exists()
+    assert result["paths"]["config_file"] == str(root / "mneme.toml")
+    assert any("service install" in step for step in result["next_steps"])
+    assert any("--install-root" in step and "codex-ingest" in step for step in result["next_steps"])
+
+    env_text = (root / ".local" / "mneme.env").read_text(encoding="utf-8")
+    serve_script = (root / "bin" / "mneme-serve").read_text(encoding="utf-8")
+    config = (root / "mneme.toml").read_text(encoding="utf-8")
+    mcp_snippet = (root / "codex" / "mcp_config.toml.snippet").read_text(encoding="utf-8")
+    hook_example = (root / "codex" / "hooks.capture.example.json").read_text(encoding="utf-8")
+    sample_transcript = json.loads(
+        (root / ".local" / "mneme-codex-sample-transcript.json").read_text(encoding="utf-8")
+    )
+
+    assert env_text.startswith("MNEME_AUTH_TOKEN=")
+    assert "mneme_service.cli serve" in serve_script
+    assert "--config" in serve_script
+    assert str(root / ".local" / "mneme.db") in serve_script
+    assert "require_embeddings = false" in config
+    assert "[providers.embeddings]" in config
+    assert str(root / "bin" / "mneme-mcp") in mcp_snippet
+    assert "MNEME_AUTH_TOKEN" not in mcp_snippet
+    assert "codex-hook-capture" in hook_example
+    assert "codex-hook-ingest" not in hook_example
+    assert sample_transcript["session"]["session_id"] == "mneme-codex-global-smoke"
+    assert resolve_token(install_root=root)
+
+
+def test_codex_status_reports_missing_daemon_without_token_leak(tmp_path: Path) -> None:
+    from mneme_service.codex_setup import codex_desktop_status, setup_codex_desktop_global
+
+    root = tmp_path / "mneme-codex"
+    setup_codex_desktop_global(install_root=root)
+    bin_dir = root / ".venv" / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "mneme").write_text("", encoding="utf-8")
+    (bin_dir / "mneme-codex").write_text("", encoding="utf-8")
+    result = codex_desktop_status(
+        install_root=root,
+        base_url="http://127.0.0.1:9",
+        timeout=0.05,
+        service_label="com.mneme.codex.test-missing-daemon",
+    )
+    serialized = json.dumps(result, sort_keys=True)
+
+    assert result["schema_version"] == "mneme.codex_status.v0"
+    assert result["readiness"] == "BROKEN"
+    assert result["token"]["present"] is True
+    assert result["token"]["source"] == "install-root-env-file"
+    assert result["daemon"]["health"]["ok"] is False
+    assert result["commands"]["install_root"]["mneme"] == str(bin_dir / "mneme")
+    assert result["commands"]["install_root"]["mneme-codex"] == str(bin_dir / "mneme-codex")
+    assert result["provider_capabilities"]["supports_embeddings"] is False
+    assert result["service"]["plist_exists"] is False
+    assert "MNEME_AUTH_TOKEN=" not in serialized
+
+
+def test_codex_service_install_dry_run_is_token_safe(tmp_path: Path) -> None:
+    from mneme_service.codex_setup import codex_service_install, setup_codex_desktop_global
+
+    root = tmp_path / "mneme-codex"
+    setup_codex_desktop_global(install_root=root)
+
+    result = codex_service_install(install_root=root, start=True, dry_run=True)
+    serialized = json.dumps(result, sort_keys=True)
+
+    assert result["schema_version"] == "mneme.codex_service.v0"
+    assert result["action"] == "install"
+    assert result["dry_run"] is True
+    assert result["start"]["action"] == "start"
+    assert result["start"]["commands"][0]["dry_run"] is True
+    assert result["would_write"].endswith("com.mneme.codex.plist")
+    assert "MNEME_AUTH_TOKEN=" not in serialized

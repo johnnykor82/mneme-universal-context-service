@@ -63,7 +63,7 @@ but runtime pieces remain per-machine:
 - configure `mneme mcp` in that machine's Codex environment;
 - set local tokens and provider secrets;
 - review and trust hook config on that machine;
-- run `mneme codex-hook-capture` locally before enabling hook ingestion.
+- run `mneme-codex codex-hook-capture` locally before enabling hook ingestion.
 
 For future automated installers, treat each host as a separate install target
 and provide an idempotent per-machine verify command.
@@ -81,10 +81,14 @@ memory.
 ## Public Release Status
 
 Phase 15 publication preparation selected Apache-2.0 and completed the current
-publication checklist. Phase 14C daemon/core parity is complete, so the next
-publication work is creating or choosing the GitHub repository, publishing
-Mneme plus `adapters/codex`, and rehearsing installation on the second Codex
-machine as if it were a new user setup. Ongoing adapter work must preserve a
-clear installation story for future GitHub users: explicit prerequisites,
+publication checklist. Phase 14C daemon/core parity is complete, but public
+publication must split the Mneme engine/core from host adapters. The first
+mixed repository was made private and should not be used as the public install
+source. The next publication work is a clean core repository, a separate Codex
+adapter repository/package, and then a second-machine installation rehearsal as
+if by a new user. The chosen GitHub names are
+`johnnykor82/mneme-universal-context-service` for core and
+`johnnykor82/mneme-codex-adapter` for Codex. Ongoing adapter work must preserve
+a clear installation story for future GitHub users: explicit prerequisites,
 copyable commands, example configs with placeholders, and no hidden dependency
 on local private paths.
