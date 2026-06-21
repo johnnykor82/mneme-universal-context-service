@@ -694,10 +694,10 @@
   evidence.
 - Operational caveat: the running Codex MCP uses the installed
   `mneme-context-service` wheel in `/Users/openclaw/.mneme-codex/.venv`.
-  The package is now reinstalled from GitHub commit `365c4f9`; the REST daemon
-  was restarted after the functional code update, but an already-open Codex
-  session may still need a new thread or MCP/Codex restart before the UI/tool
-  registry lists newly added MCP tools.
+  The package is now reinstalled from the current GitHub `main`; the REST
+  daemon was restarted after the functional code update, but an already-open
+  Codex session may still need a new thread or MCP/Codex restart before the
+  UI/tool registry lists newly added MCP tools.
 
 ## Issues Encountered
 
