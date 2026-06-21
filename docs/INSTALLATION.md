@@ -39,6 +39,17 @@ Health check:
 curl -sS http://127.0.0.1:8765/v1/health
 ```
 
+This check only proves the process is alive. Local REST clients must send the
+same bearer token configured for `mneme serve` or `mneme mcp`. For a hard
+dependency, verify authenticated session usability before the run:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8765/v1/readiness/session \
+  -H "Authorization: Bearer $MNEME_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"019edb86-1d22-78a3-b9e4-e6121c294056","query":"RLM Orchestrator MVP 1 benchmark evidence project status","require_evidence":true,"top_k":1}'
+```
+
 ## Start The MCP Server
 
 Run the MCP server as a separate process and point it at the REST daemon:

@@ -6,8 +6,12 @@ Turn the idea behind `hermes-mneme` into a vendor-neutral context-management ser
 
 ## Current Phase
 
+Phase 17B: Mneme/RLM REST/MCP consistency spec alignment - complete; docs now reflect authenticated readiness and REST auth boundary.
+Phase 17A: standalone Mneme specification v0.4 review response - complete; ready for next reviewer pass.
+Phase 18: RLM Orchestrator Mneme REST/MCP consistency and readiness hardening - complete in checkout; live daemon reinstall/restart is pending if `/v1/readiness/session` must be available on port 8765 immediately.
 Phase 13: Codex memory dogfood and knowledge-base workflow - in progress; next focus is updated global Codex install rehearsal on the second machine.
 Phase 13B: Codex/MCP session discovery hotfix - complete; pushed to GitHub and installed into the global local Codex/Mneme environment.
+Phase 17: standalone Mneme specification consolidation after external review - complete; ready for reviewer pass.
 Phase 14C: full Hermes-Mneme parity completion - complete.
 Phase 14B: parity hardening while Hermes PR is pending - complete.
 Phase 16: Hermes host adapter planning - deferred until upstream Hermes context-engine hook PR is accepted.
@@ -341,6 +345,91 @@ Phase 10 MCP server and adapter substrate is complete.
 - [ ] Map the Hermes adapter to `MNEME_HOST_ADAPTER_CONTRACT_V0.md` conformance tests.
 - [ ] Do not modify live Hermes or live `hermes-mneme` until a dedicated implementation phase is explicitly approved.
 - **Status:** deferred until upstream Hermes context-engine hook PR is accepted; avoid duplicate work against the legacy compaction path
+
+### Phase 17: Standalone Mneme Specification Consolidation
+
+- [x] Ingest external reviewer feedback and classify issues into blockers,
+      v0 requirements, known limitations, and future roadmap.
+- [x] Inspect current core/API/adapter/provider/benchmark docs so the new
+      specification does not drift from implemented reality.
+- [x] Create one standalone specification file that can be sent to reviewers
+      without attaching the existing document set.
+- [x] Explicitly resolve or document the reviewed gaps: `BYTES_REF`/blob
+      lifecycle, project isolation, token handling, idempotency, provider mode
+      mapping, discovery leakage, MCP/REST errors, migrations, concurrency,
+      OpenAPI, Codex `TOOLS_ONLY` limits, prompt-injection risk, and benchmark
+      baselines.
+- [x] Update planning files with the new artifact, verification, and any
+      intentional non-goals before asking for another reviewer pass.
+- **Status:** complete; send `docs/MNEME_STANDALONE_SPEC.md` as the single
+  reviewer packet. After approval, create a compliance implementation plan
+  against the gap register in section 27.
+
+### Phase 17A: Standalone Mneme Specification v0.4 Review Response
+
+- [x] Read the new v0.3 reviewer responses and classify remaining blockers and
+      non-blocking architecture concerns.
+- [x] Update `docs/MNEME_STANDALONE_SPEC.md` into draft v0.4 so it remains a
+      single self-contained reviewer packet.
+- [x] Close the new review findings around owner-token/static-token scope
+      semantics, adapter-supplied freshness, SQLite-backed blob storage,
+      explicit blob GC triggers, audit record schema, trace/cost endpoints,
+      execution-state update bodies, direct segment endpoints, serialized
+      SQLite writes, prompt-injection wrappers, tokenizer guardrails,
+      OpenAPI-as-source-of-truth, and MCP default-session context.
+- [x] Refresh required tests, traceability matrix, compliance gap register, and
+      reviewer checklist to match the v0.4 decisions.
+- [x] Update planning files and run documentation hygiene checks.
+- **Status:** complete; send `docs/MNEME_STANDALONE_SPEC.md` as the v0.4
+  reviewer packet. After approval, create a compliance implementation plan
+  against section 27.
+
+### Phase 17B: Mneme/RLM REST/MCP Consistency Spec Alignment
+
+- [x] Check the Mneme standalone spec, API/MCP contract, and RLM Orchestrator
+      spec against the recent REST/MCP consistency fix.
+- [x] Ensure the docs state that direct REST requires the configured bearer
+      token even when MCP works through its own configured token.
+- [x] Ensure `/v1/health` is described as liveness only, not a hard-dependency
+      readiness check.
+- [x] Ensure run-start checks use authenticated `/v1/readiness/session`, with
+      a temporary authenticated `context_search top_k=1` fallback for daemons
+      that have not yet deployed the endpoint.
+- [x] Ensure specs distinguish `401` auth failure, `404` missing session,
+      `412` no evidence, and `200 ok=true` with usable evidence.
+- [x] Ensure specs preserve the rule that RLM Orchestrator uses Mneme REST and
+      does not read Mneme SQLite directly.
+- **Status:** complete; no code changes.
+
+### Phase 18: RLM Orchestrator Mneme REST/MCP Consistency and Readiness Hardening
+
+- [x] Diagnose why MCP can read session
+      `019edb86-1d22-78a3-b9e4-e6121c294056` while REST `context_search`
+      returns `UNAUTHENTICATED` without `MNEME_AUTH_TOKEN`.
+- [x] Confirm and document the REST auth boundary for local clients, including
+      how RLM Orchestrator should obtain/configure the token.
+- [x] Confirm and document that REST tool calls accept the same external
+      `session_id` values as MCP, including
+      `019edb86-1d22-78a3-b9e4-e6121c294056`.
+- [x] Add or document an authenticated, cheap readiness path that proves Mneme
+      is usable for a session at run start, not merely process-alive.
+- [x] Normalize REST tool failure envelopes so auth, missing sessions, and
+      other tool failures are distinguishable and machine-readable.
+- [x] Add regression tests proving MCP and authenticated REST return consistent
+      results for the same valid session id, and that auth failure, invalid
+      token, and not-found session are not confused with empty evidence.
+- [x] Update public/internal docs for the RLM Orchestrator integration contract.
+- **Acceptance criteria:** RLM Orchestrator can fail closed at run start using a
+  documented authenticated REST check; valid REST `context_search` for the RLM
+  session returns evidence; missing/invalid token and missing session produce
+  distinct `{ok:false,error:{...},warnings:[]}` envelopes.
+- **Verification:** focused pytest for REST auth/readiness/session errors and
+  REST/MCP parity, then full pytest/compile checks if the code surface changes.
+- **Status:** complete in this checkout. Focused tests, contract tests, full
+  pytest, py_compile, and hygiene scans passed. Live authenticated REST
+  `context_search` against the running daemon returned 5 RLM evidence results;
+  the running daemon was not reinstalled/restarted in this slice, so the new
+  `/v1/readiness/session` endpoint requires deployment before live use.
 
 ## Key Questions
 

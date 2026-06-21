@@ -16,7 +16,16 @@ from .enrichment import (
     HttpLLMEnrichmentProvider,
     apply_enrichment_updates,
 )
-from .errors import MnemeError, bad_request, conflict, not_found, payload_too_large, unauthenticated, validation_error
+from .errors import (
+    MnemeError,
+    bad_request,
+    conflict,
+    failed_precondition,
+    not_found,
+    payload_too_large,
+    unauthenticated,
+    validation_error,
+)
 from .reranker import HttpRerankerProvider, RerankerProvider, RerankResult
 from .security import bearer_is_valid, redact
 from .segments import update_segment_for_event
@@ -135,6 +144,82 @@ def create_app(
             "max_tool_result_events": settings.max_tool_result_events,
             "supported_schema_versions": SUPPORTED_SCHEMAS,
         }
+
+    @app.post("/v1/readiness/session")
+    async def session_readiness(payload: dict[str, Any], _auth: None = Depends(require_auth)) -> dict[str, Any]:
+        session_id = require_payload_str(payload, "session_id")
+        require_session(session_id)
+        require_evidence = bool(payload.get("require_evidence", True))
+        top_k = parse_int(payload, "top_k", default=1, minimum=1, maximum=10)
+        query = optional_payload_str(payload, "query") or ""
+        safe_query = redact(query)
+        filters = search_filters(payload)
+        scope_payload = dict(payload)
+        scope_payload["scope"] = payload.get("scope") or "SESSION"
+        scope = parse_search_scope(scope_payload)
+
+        if query:
+            results, retrieval, warnings = hybrid_context_search(
+                store,
+                embedding_index,
+                session_id=session_id,
+                query=safe_query,
+                top_k=top_k,
+                filters=filters,
+                scope=scope,
+                reranker=reranker,
+                reranker_top_k=settings.reranker_top_k,
+            )
+            evidence_ids = [item["event_id"] for item in results]
+            check = "context_search"
+        else:
+            events = store.recent_events(session_id, top_k)
+            results = summarize_events(events)
+            retrieval = {
+                "candidate_count": len(results),
+                "selected_count": len(results),
+                "strategies": ["RECENT"],
+                "degraded": False,
+                "fallbacks": [],
+            }
+            warnings = []
+            evidence_ids = [item["event_id"] for item in results]
+            check = "recall_recent"
+
+        if require_evidence and not evidence_ids:
+            raise failed_precondition(
+                "Session readiness check found no evidence.",
+                session_id=session_id,
+                reason="NO_EVIDENCE",
+                query=safe_query,
+                required_check=check,
+                evidence_count=0,
+            )
+
+        trace_id = audit_memory_tool(
+            store,
+            session_id,
+            "session_readiness",
+            evidence_ids,
+            retrieval=retrieval,
+            warnings=warnings,
+        )
+        return tool_response(
+            {
+                "ready": True,
+                "session_id": session_id,
+                "required_check": check,
+                "evidence_count": len(evidence_ids),
+                "evidence_event_ids": evidence_ids,
+                "checks": {
+                    "authenticated": True,
+                    "session_found": True,
+                    "evidence_found": bool(evidence_ids),
+                },
+            },
+            trace_id=trace_id,
+            warnings=warnings,
+        )
 
     @app.post("/v1/sessions/start")
     async def start_session(payload: dict[str, Any], _auth: None = Depends(require_auth)) -> dict[str, Any]:

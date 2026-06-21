@@ -131,6 +131,112 @@ def test_auth_health_capabilities_and_session_idempotency(tmp_path: Path) -> Non
     assert again.json()["created"] is False
 
 
+def test_rest_tool_errors_use_uniform_envelope_for_auth_and_missing_session(tmp_path: Path) -> None:
+    api = client(tmp_path)
+    start_session(api)
+
+    missing_token = api.post(
+        "/v1/tools/context_search",
+        json={"query": "pytest", "session_id": "session-1", "top_k": 1},
+    )
+    assert missing_token.status_code == 401
+    missing_body = missing_token.json()
+    assert missing_body["ok"] is False
+    assert missing_body["warnings"] == []
+    assert missing_body["error"]["code"] == "UNAUTHENTICATED"
+
+    invalid_token = api.post(
+        "/v1/tools/context_search",
+        headers={"Authorization": "Bearer wrong-token"},
+        json={"query": "pytest", "session_id": "session-1", "top_k": 1},
+    )
+    assert invalid_token.status_code == 401
+    invalid_body = invalid_token.json()
+    assert invalid_body["ok"] is False
+    assert invalid_body["warnings"] == []
+    assert invalid_body["error"]["code"] == "UNAUTHENTICATED"
+
+    missing_session = api.post(
+        "/v1/tools/context_search",
+        headers=auth_headers(),
+        json={"query": "pytest", "session_id": "missing-session", "top_k": 1},
+    )
+    assert missing_session.status_code == 404
+    missing_session_body = missing_session.json()
+    assert missing_session_body["ok"] is False
+    assert missing_session_body["warnings"] == []
+    assert missing_session_body["error"]["code"] == "NOT_FOUND"
+    assert missing_session_body["error"]["details"]["reason"] == "SESSION_ID_NOT_FOUND"
+
+
+def test_session_readiness_requires_auth_session_and_evidence(tmp_path: Path) -> None:
+    api = client(tmp_path)
+    rlm_session_id = "019edb86-1d22-78a3-b9e4-e6121c294056"
+    start_session(api, session_id=rlm_session_id, runtime="CODEX", project_id="/repo/rlm-orchestrator")
+
+    no_auth = api.post(
+        "/v1/readiness/session",
+        json={
+            "session_id": rlm_session_id,
+            "query": "RLM Orchestrator MVP 1 benchmark evidence project status",
+        },
+    )
+    assert no_auth.status_code == 401
+    assert no_auth.json()["error"]["code"] == "UNAUTHENTICATED"
+
+    no_evidence = api.post(
+        "/v1/readiness/session",
+        headers=auth_headers(),
+        json={
+            "session_id": rlm_session_id,
+            "query": "RLM Orchestrator MVP 1 benchmark evidence project status",
+            "require_evidence": True,
+        },
+    )
+    assert no_evidence.status_code == 412
+    no_evidence_body = no_evidence.json()
+    assert no_evidence_body["ok"] is False
+    assert no_evidence_body["error"]["code"] == "FAILED_PRECONDITION"
+    assert no_evidence_body["error"]["details"]["reason"] == "NO_EVIDENCE"
+
+    accepted = ingest(
+        api,
+        [
+            event(
+                "rlm-evidence-1",
+                "RLM Orchestrator MVP 1 benchmark evidence project status is ready.",
+                session_id=rlm_session_id,
+                event_type="CODEX_HOOK",
+                role="RUNTIME",
+            )
+        ],
+        session_id=rlm_session_id,
+    )
+    assert accepted.status_code == 200, accepted.text
+
+    ready = api.post(
+        "/v1/readiness/session",
+        headers=auth_headers(),
+        json={
+            "session_id": rlm_session_id,
+            "query": "RLM Orchestrator MVP 1 benchmark evidence project status",
+            "require_evidence": True,
+            "top_k": 1,
+        },
+    )
+    assert ready.status_code == 200, ready.text
+    body = ready.json()
+    assert body["ok"] is True
+    assert body["data"]["ready"] is True
+    assert body["data"]["session_id"] == rlm_session_id
+    assert body["data"]["evidence_count"] == 1
+    assert body["data"]["checks"] == {
+        "authenticated": True,
+        "session_found": True,
+        "evidence_found": True,
+    }
+
+
 def test_event_ingestion_redaction_duplicate_conflict_and_unknown_session(tmp_path: Path) -> None:
     api = client(tmp_path)
     start_session(api)

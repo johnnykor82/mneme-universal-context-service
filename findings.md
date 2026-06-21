@@ -33,6 +33,61 @@
 
 ## Research Findings
 
+### Standalone Spec Review Consolidation Findings
+
+- External reviewers repeatedly identified the same pre-implementation/spec
+  gaps: `BYTES_REF` lacks a blob API/lifecycle, project isolation is not
+  enforceable with one global bearer token, token passing through CLI args is
+  unsafe, discovery tools may leak cross-project metadata, and SQLite schema
+  migrations/concurrency are underspecified.
+- The standalone spec must be honest about integration depth: Codex is
+  currently `TOOLS_ONLY` unless trusted hooks/importers write events, while
+  automatic prompt/context replacement requires host lifecycle hooks such as
+  `prepare_model_request` or `assemble-before-prompt`.
+- Provider behavior must be explicit: `cost_mode` is an intent, not a
+  guarantee; capabilities and provider health decide whether the server fails
+  closed, degrades with warnings, or refuses a request requiring missing
+  providers.
+- Reviewer feedback treats prompt injection through stored memory as a real
+  design risk. The spec must define evidence isolation, rendering boundaries,
+  source trust labels, and sanitization/non-execution rules without pretending
+  that text warnings alone perfectly solve LLM prompt injection.
+- The new reviewer-facing artifact should be a standalone specification rather
+  than the current index-style `docs/MNEME_DEVELOPMENT_SPEC.md`, so reviewers
+  can evaluate business requirements, architecture, API, security, operations,
+  testing, known limitations, and traceability from a single file.
+- Created `docs/MNEME_STANDALONE_SPEC.md` as draft v0.3. It explicitly covers
+  blob/BYTES_REF API, project-scoped auth/isolation, safe token handling,
+  insecure development mode, provider/cost-mode mapping, execution-state update
+  API, manual segment boundaries, deterministic context expansion, fluid
+  context budget packing, MCP/REST error mapping, migration/concurrency,
+  OpenAPI, benchmark baselines, prompt-injection limitations, default redaction
+  classes, and a reviewer concern coverage matrix.
+- The standalone spec intentionally records several items as compliance gaps
+  instead of pretending the alpha implementation already satisfies them. After
+  approval, those gaps should become the implementation plan for bringing the
+  plugin/core into spec compliance.
+- The v0.4 review response tightens the spec without adding enterprise scope:
+  local v0 auth is an owner token plus logical project isolation, with static
+  scoped tokens only when multi-project sharing is enabled.
+- Freshness is no longer presented as something Mneme can infer magically from
+  memory age. `CURRENT` evidence must come from a host adapter/source connector
+  that just verified the source of truth; Mneme core may only derive
+  `RECENT`/`HISTORICAL` from timestamps without external verification.
+- v0.4 makes SQLite BLOB storage the default ACID blob store and demotes
+  filesystem/file URI blob storage to an experimental, trusted-path-gated
+  adapter mode.
+- v0.4 closes concrete API/schema review gaps: `mneme.audit_record.v0`,
+  `/v1/traces/{trace_id}`, `/v1/costs/session/{session_id}`, explicit
+  execution-state update request/response bodies, direct segment list/get
+  endpoints, `source_trust`, `mcp_tool_versions`, and graph edge weights.
+- v0.4 replaces vague or risky mechanics with testable ones: serialized SQLite
+  writer lane instead of independent writer retries, fixed-slot context packing
+  for v0, rejection/downgrade of `CHAR_APPROXIMATE` for STANDARD/QUALITY
+  model-bound prepare, data-only prompt-injection wrappers, OpenAPI as REST
+  source of truth, and MCP default-session injection when the host knows the
+  current session.
+
 ### RLM Orchestrator Proposal Findings
 
 - RLM Orchestrator should be treated as a separate product/repository, not as
@@ -67,6 +122,52 @@
   deterministic static subtemplates, automated MVP 1 baseline comparison,
   cancellation semantics before MVP 2 parallel workers, and removal of the
   vague fast-path phrase "narrow lookup".
+
+### RLM Orchestrator REST/MCP Consistency Findings
+
+- Phase 13B already verified the real `_rlm-orchestrator` Mneme session id as
+  `019edb86-1d22-78a3-b9e4-e6121c294056`.
+- The current user-provided failure is an unauthenticated REST call to
+  `/v1/tools/context_search`, not evidence that REST rejects the session id.
+  The local REST daemon is expected to require a bearer token unless explicitly
+  started in insecure development mode.
+- MCP can read the same session because the installed local MCP entrypoint is
+  configured with the Mneme token through the Codex/Mneme runtime environment.
+  That is an auth boundary, not proof that unauthenticated REST should work.
+- RLM Orchestrator MVP 1 needs a cheap authenticated readiness check that
+  proves tool access and session visibility before benchmark execution, because
+  `/v1/health` only proves the process is alive.
+- REST tool callers need distinct machine-readable failures for
+  missing/invalid token and missing session so the orchestrator can fail closed
+  differently for auth/config errors versus empty evidence.
+- Implemented repo-level fixes now make REST failures uniform:
+  `{ok:false,error:{...},warnings:[]}` for auth and session/tool failures while
+  preserving the existing top-level `error` key for compatibility.
+- Added authenticated `POST /v1/readiness/session`. With
+  `require_evidence=true`, it returns `412 FAILED_PRECONDITION` and
+  `details.reason=NO_EVIDENCE` when the session exists but the run-start
+  evidence gate has no hits.
+- Live authenticated REST smoke against the running daemon proved that
+  `context_search` accepts session id
+  `019edb86-1d22-78a3-b9e4-e6121c294056` and returns 5 RLM evidence results
+  when a valid bearer token is supplied. The original failing curl lacked this
+  token.
+- The running global daemon was not reinstalled or restarted during this slice.
+  It can serve authenticated `context_search` now, but the new
+  `/v1/readiness/session` endpoint requires deploying this checkout before live
+  use on `127.0.0.1:8765`.
+- Phase 17B aligned the specs with the Phase 18 fix: MCP success is evidence
+  that the MCP process has a valid REST token, not evidence that unauthenticated
+  REST should work. RLM Orchestrator must use Mneme REST with
+  `MNEME_AUTH_TOKEN`/configured `token_env`, call authenticated
+  `/v1/readiness/session` at run start, and temporarily fall back to
+  authenticated `context_search top_k=1` only when the live daemon has not yet
+  deployed the readiness endpoint.
+- The spec-level fail-closed taxonomy is now explicit: `401` means auth/config
+  failure, `404` means missing/unknown session, `412` with
+  `details.reason=NO_EVIDENCE` means the session exists but required evidence
+  is absent, and `200 ok=true` with evidence means Mneme is usable for the
+  run-start gate. These cases must not be collapsed into "empty memory".
 
 ### Current Mneme Prototype Facts
 

@@ -1,5 +1,122 @@
 # Progress Log: Mneme Universal Context Service
 
+## 2026-06-21 - Mneme/RLM REST/MCP Consistency Spec Alignment
+
+- Read `planning-with-files`, `receiving-code-review`, and `mneme-memory`
+  instructions before this documentation pass.
+- Restored local context from `task_plan.md`, `findings.md`, and
+  `progress.md`; `session-catchup.py` produced no unsynced context output.
+- Checked `docs/MNEME_STANDALONE_SPEC.md`,
+  `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md`,
+  `API_MCP_CONTRACT_V0.md`, `README.md`, and `docs/INSTALLATION.md` against
+  the recent REST/MCP consistency fix.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` to explicitly state that direct REST
+  requires bearer auth even when MCP works, `/v1/health` is liveness only, hard
+  dependencies must use authenticated `/v1/readiness/session`, and the
+  temporary fallback is authenticated `context_search top_k=1`.
+- Updated `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` to preserve the
+  fail-closed startup contract, distinguish auth/session/no-evidence outcomes,
+  and avoid misdiagnosing MCP-success/REST-401 as a bad `session_id`.
+- Updated `API_MCP_CONTRACT_V0.md` with the same fallback and MCP-vs-direct-REST
+  auth boundary note.
+- Added Phase 17B to `task_plan.md` and recorded the decision in
+  `findings.md`.
+- Verification: `git diff --check` passed; conflict-marker scan passed;
+  trailing-whitespace scan passed; checklist grep found the required
+  token/readiness/session/error-boundary statements in the Mneme standalone
+  spec, RLM Orchestrator spec, and API/MCP contract.
+
+## 2026-06-21 - Standalone Specification v0.4 Review Response
+
+- Read the four new v0.3 external reviewer responses and treated them as a
+  receiving-code-review pass over the standalone spec rather than code.
+- Added Phase 17A to `task_plan.md` for the v0.4 reviewer-response iteration.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` from draft v0.3 to draft v0.4.
+- Closed the main remaining spec gaps:
+  owner-token/static-token auth semantics, adapter-supplied freshness,
+  SQLite-backed blob storage, explicit blob GC and retention cleanup triggers,
+  multipart blob ingest, audit record schema, trace/cost endpoints,
+  execution-state update request bodies, direct segment endpoints,
+  serialized SQLite writes, tokenizer quality guardrails, prompt-injection
+  data-only wrappers, OpenAPI-as-source-of-truth, graph edge weights, and MCP
+  default-session context.
+- Reworked required contract tests, traceability matrix, compliance gap
+  register, review finding coverage matrix, and reviewer checklist so a future
+  code review can compare implementation coverage against one file.
+- Updated `findings.md` with the v0.4 decisions.
+- Verification: `git diff --check` passed; conflict-marker scan passed;
+  trailing-whitespace scan passed; stale-term scan only found the expected
+  safe test name `audit_disabled_only_by_test_daemon_config`.
+
+## 2026-06-21 - RLM Orchestrator REST/MCP Consistency Started
+
+- Read `planning-with-files`, `mneme-memory`, `systematic-debugging`,
+  `test-driven-development`, and `git-workflow-and-versioning` instructions
+  before code changes.
+- Restored local context from `task_plan.md`, `findings.md`, and
+  `progress.md`; `session-catchup.py` produced no unsynced context output.
+- Added Phase 18 to `task_plan.md` for RLM Orchestrator Mneme REST/MCP
+  consistency and readiness hardening.
+- Recorded the initial diagnosis in `findings.md`: the user-provided REST
+  failure is an unauthenticated tool call, while prior Phase 13B evidence
+  already confirms the RLM session id exists and authenticated REST discovery
+  can resolve it.
+- Current git state was already dirty before this slice:
+  `README.md`, `docs/MNEME_DEVELOPMENT_SPEC.md`, `findings.md`,
+  `progress.md`, `task_plan.md`, and new `docs/MNEME_STANDALONE_SPEC.md`.
+- RED verification:
+  `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_contract.py::test_rest_tool_errors_use_uniform_envelope_for_auth_and_missing_session tests/test_contract.py::test_session_readiness_requires_auth_session_and_evidence tests/test_mcp_contract.py::test_mcp_and_rest_accept_same_codex_uuid_session_id -q`
+  failed as expected: REST errors lacked top-level `ok`, and
+  `/v1/readiness/session` returned 404 because it did not exist. The UUID
+  REST/MCP parity regression already passed.
+- GREEN verification:
+  the same focused pytest command now passes with `3 passed, 1 warning`.
+  Implemented uniform REST error envelopes, `FAILED_PRECONDITION` for
+  no-evidence readiness, authenticated `/v1/readiness/session`, and a
+  REST/MCP parity regression for session id
+  `019edb86-1d22-78a3-b9e4-e6121c294056`.
+- Contract verification:
+  `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_contract.py tests/test_mcp_contract.py -q`
+  passed with `27 passed, 1 warning`.
+- Live REST smoke:
+  sandboxed localhost access failed with `PermissionError: [Errno 1] Operation
+  not permitted`; re-ran unsandboxed without printing the token. Authenticated
+  `POST /v1/tools/context_search` against the running daemon and session
+  `019edb86-1d22-78a3-b9e4-e6121c294056` returned HTTP 200,
+  `ok=true`, `result_count=5`, and no warnings. This confirms REST accepts the
+  same session id when a valid bearer token is supplied.
+- Full verification:
+  `env TMPDIR=/private/tmp .venv/bin/python -m pytest -q` passed with
+  `141 passed, 1 warning`; `python3 -m py_compile mneme_service/app.py
+  mneme_service/errors.py mneme_service/rest_client.py` passed; conflict-marker
+  and trailing-whitespace scans over touched code/docs/planning files returned
+  no matches.
+
+## 2026-06-21 - Standalone Specification Consolidation Started
+
+- Read the `planning-with-files`, `receiving-code-review`,
+  `spec-driven-development`, and `mneme-memory` skill instructions before
+  touching docs.
+- Restored local project context from `task_plan.md`, `findings.md`, and
+  `progress.md`.
+- Read four external reviewer responses attached by the user and classified the
+  recurring findings into protocol/API, security/privacy, integration depth,
+  operations, testing, and publication-readiness buckets.
+- Added Phase 17 to the plan for a single standalone Mneme specification that
+  can be sent to reviewers without additional attachments.
+- Created `docs/MNEME_STANDALONE_SPEC.md` as an 1818-line single-file draft
+  specification covering product boundary, requirements, integration depth,
+  host lifecycle, architecture, config, auth/isolation, providers, tokenization,
+  data model, blob/BYTES_REF lifecycle, REST/MCP APIs, audit, security,
+  migrations/concurrency, operations, OpenAPI, errors, idempotency, tests,
+  traceability, known limits, compliance gaps, and reviewer checklist.
+- Updated `README.md` to point architecture/code reviewers to
+  `docs/MNEME_STANDALONE_SPEC.md`.
+- Marked the older `docs/MNEME_DEVELOPMENT_SPEC.md` as an index-style
+  historical spec and pointed readers to the standalone reviewer packet.
+- Verification: `git diff --check` passed; conflict marker scan passed;
+  trailing whitespace scan passed.
+
 ## 2026-06-18 - RLM Orchestrator Architecture Review Draft
 
 - Created `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` as an architecture
@@ -27,12 +144,16 @@
 
 ## Current Snapshot
 
-- **Current phase:** Phase 13 - Codex memory dogfood and corrected GitHub publication split.
-- **Current status:** Phase 14C full Hermes-Mneme daemon/core parity completion is complete; publication is no longer blocked by original-core parity. The first mixed GitHub publication was quarantined as private because it combined engine, Codex adapter, and internal planning/dogfood material. Hermes adapter work remains deferred until upstream native context-engine hooks are accepted.
-- **Next action:** rerun the second-machine install rehearsal as a user-global
-  Codex Desktop setup from the updated public Codex adapter commit `2a76286`,
-  using `mneme-codex setup`, `mneme-codex service`, `mneme-codex doctor`, and
-  provider-capability checks.
+- **Current phase:** Phase 17B Mneme/RLM REST/MCP consistency spec alignment is
+  complete.
+- **Current status:** `docs/MNEME_STANDALONE_SPEC.md` is the single-file draft
+  v0.4 reviewer packet with the REST/MCP auth/readiness addendum reflected.
+  Phase 14C daemon/core parity remains complete; Hermes
+  adapter work remains deferred until upstream native context-engine hooks are
+  accepted.
+- **Next action:** send `docs/MNEME_STANDALONE_SPEC.md` to reviewers. After
+  approval, create a compliance implementation plan from section 27 of the
+  standalone spec.
 - **Active plan:** Phase 13 publication split correction after `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md` completion.
 - **Primary source files:** `task_plan.md`, `findings.md`, `progress.md`, `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md`, `MILESTONE_4_CODEX_MEMORY_DOGFOOD_AND_PROVIDER_CONFIG_PLAN.md`, `adapters/codex/MNEME_CODEX_MCP_USAGE.md`, `API_MCP_CONTRACT_V0.md`, `MNEME_HOST_ADAPTER_CONTRACT_V0.md`.
 - **Hard constraints:** do not touch live Hermes or live `hermes-mneme`; work only in `_mneme-universal-context-service`.

@@ -115,6 +115,20 @@ implementation.
 
 1. **Mneme is a hard dependency.**
    - MVP 1 uses Mneme REST as the canonical memory/evidence interface.
+   - REST calls use the bearer token from `MNEME_AUTH_TOKEN` or the configured
+     `token_env`; unset or invalid tokens are startup failures.
+   - Startup must call authenticated `POST /v1/readiness/session` with the
+     configured `session_id`, a benchmark/task query, and
+     `require_evidence=true`. `/v1/health` alone is insufficient because it
+     proves only daemon liveness.
+   - If the deployed Mneme daemon does not yet expose
+     `/v1/readiness/session`, MVP 1 may temporarily use authenticated
+     `POST /v1/tools/context_search` with `top_k=1` as the run-start gate.
+     This fallback must distinguish `401` auth failure, `404` missing session,
+     and zero evidence.
+   - MCP success for the same session does not imply unauthenticated REST
+     success. MCP may work because its process has the configured bearer token;
+     direct REST clients must provide the same token boundary.
    - The orchestrator does not read Mneme's SQLite database directly.
    - The orchestrator does not write orchestration state back into Mneme.
    - Future non-Mneme memory backends may be explored through a `MemoryBackend`
@@ -369,6 +383,24 @@ The orchestrator must not require access to Mneme's internal database.
 
 MVP 1 uses Mneme REST. Mneme MCP may be supported later as an adapter fallback
 or host-facing convenience, but it is not the canonical MVP 1 path.
+
+The REST adapter uses the same Mneme `session_id` values exposed through MCP.
+The verified RLM/Codex session id
+`019edb86-1d22-78a3-b9e4-e6121c294056` is therefore valid for REST
+`context_search` when the request includes the configured bearer token.
+If MCP `get_execution_state` or `context_search` works for this session while
+direct REST returns `401 UNAUTHENTICATED`, treat it as an auth-boundary failure,
+not as evidence that the session id format is invalid.
+Startup must distinguish:
+
+- `401 UNAUTHENTICATED`: missing/invalid REST token; fail configuration.
+- `404 NOT_FOUND`: unknown session id; fail session resolution.
+- `412 FAILED_PRECONDITION` with `details.reason=NO_EVIDENCE`: session exists
+  but required evidence is unavailable; fail the run-start evidence gate.
+- `200 ok=true` with empty fallback `context_search` results: session/auth are
+  valid, but required evidence is unavailable; fail the run-start evidence
+  gate.
+- `200 ok=true`: Mneme is usable for the session and can return evidence.
 
 ### Filesystem Read Adapter
 

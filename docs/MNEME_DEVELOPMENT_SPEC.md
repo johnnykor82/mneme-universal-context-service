@@ -3,6 +3,10 @@
 Status: review index spec
 Date: 2026-06-20
 
+Note: this older document is an index-style review specification. For a
+single-file, self-contained reviewer packet, use
+`docs/MNEME_STANDALONE_SPEC.md`.
+
 This document is the reviewer-facing specification for Mneme Context Service.
 It consolidates the product boundary, business requirements, technical
 requirements, acceptance criteria, and traceability links needed to review the

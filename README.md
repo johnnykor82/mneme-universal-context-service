@@ -36,11 +36,13 @@ the host adapter contract.
 
 ## Specification
 
-For architecture/code review, start with
-[docs/MNEME_DEVELOPMENT_SPEC.md](docs/MNEME_DEVELOPMENT_SPEC.md). It ties the
-business requirements, product boundary, functional requirements, architecture,
-contracts, security model, tests, and traceability links into one reviewer-facing
-index spec.
+For architecture/code review, send
+[docs/MNEME_STANDALONE_SPEC.md](docs/MNEME_STANDALONE_SPEC.md). It is the
+single-file reviewer specification and does not require attaching the rest of
+the documentation set.
+
+[docs/MNEME_DEVELOPMENT_SPEC.md](docs/MNEME_DEVELOPMENT_SPEC.md) remains a
+historical/index-style specification from the earlier review pass.
 
 ## Quick Start
 
@@ -58,6 +60,17 @@ Health check:
 
 ```bash
 curl -sS http://127.0.0.1:8765/v1/health
+```
+
+`/v1/health` is a liveness check only. REST clients that require Mneme
+evidence at run start should use the same token as the daemon/MCP process and
+call authenticated session readiness:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8765/v1/readiness/session \
+  -H "Authorization: Bearer $MNEME_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"019edb86-1d22-78a3-b9e4-e6121c294056","query":"RLM Orchestrator MVP 1 benchmark evidence project status","require_evidence":true,"top_k":1}'
 ```
 
 Run the MCP server as a separate process pointing at the daemon:

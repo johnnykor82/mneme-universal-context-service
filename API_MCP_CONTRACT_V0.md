@@ -148,8 +148,9 @@ prompt/context replacement.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/v1/health` | Local daemon readiness and version check. |
+| `GET` | `/v1/health` | Local daemon liveness and version check; does not prove authenticated tool usability. |
 | `GET` | `/v1/capabilities` | Discover enabled modes, providers, limits, and supported schema versions. |
+| `POST` | `/v1/readiness/session` | Authenticated cheap check that a session exists and, when required, can return evidence. |
 | `POST` | `/v1/sessions/start` | Create or resume a session. |
 | `POST` | `/v1/events` | Ingest one or more normalized events. |
 | `POST` | `/v1/turns/complete` | Mark a turn finalized and attach usage/status. |
@@ -258,6 +259,59 @@ Response:
   }
 }
 ```
+
+### `POST /v1/readiness/session`
+
+Purpose: fail closed at run start when Mneme is unavailable, the REST token is
+missing/invalid, the session id is unknown, or required evidence is absent.
+This endpoint is authenticated and should be preferred over `/v1/health` for
+hard dependencies such as RLM Orchestrator.
+
+Request:
+
+```json
+{
+  "session_id": "019edb86-1d22-78a3-b9e4-e6121c294056",
+  "query": "RLM Orchestrator MVP 1 benchmark evidence project status",
+  "require_evidence": true,
+  "top_k": 1,
+  "scope": "SESSION"
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "ready": true,
+    "session_id": "019edb86-1d22-78a3-b9e4-e6121c294056",
+    "required_check": "context_search",
+    "evidence_count": 1,
+    "evidence_event_ids": ["event-123"],
+    "checks": {
+      "authenticated": true,
+      "session_found": true,
+      "evidence_found": true
+    }
+  },
+  "trace_id": "trace-readiness-001",
+  "warnings": []
+}
+```
+
+Missing or invalid tokens return `401 UNAUTHENTICATED`. Unknown session ids
+return `404 NOT_FOUND` with discovery guidance. When `require_evidence=true`
+and the session exists but no evidence is returned, the service returns
+`412 FAILED_PRECONDITION` with `details.reason=NO_EVIDENCE`.
+
+Deployment fallback: if an already-running daemon has not yet deployed
+`/v1/readiness/session`, hard-dependency clients such as RLM Orchestrator may
+temporarily call authenticated `POST /v1/tools/context_search` with `top_k=1`
+as the run-start gate. The fallback must still distinguish `401`
+authentication failure, `404` missing session, and `200 ok=true` with zero
+results/no evidence.
 
 ### `POST /v1/sessions/start`
 
@@ -611,7 +665,14 @@ REST tool responses use the shared tool envelope:
 ```
 
 Tool failures use the normal REST status code plus the standard REST error
-envelope. MCP tools use the MCP result envelope described below.
+envelope. REST and MCP session-bound tools accept the same Mneme `session_id`
+value; `019edb86-1d22-78a3-b9e4-e6121c294056` is an example of the external
+Codex/Mneme session id format accepted by both surfaces. MCP tools use the MCP
+result envelope described below.
+
+MCP success does not imply unauthenticated REST success. The MCP process may
+proxy REST with a configured bearer token such as `MNEME_AUTH_TOKEN`; direct
+REST clients must send their own valid token.
 
 ## Core Schemas
 
@@ -1646,6 +1707,7 @@ REST errors must use this shape:
 
 ```json
 {
+  "ok": false,
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "Invalid event payload.",
@@ -1656,7 +1718,8 @@ REST errors must use this shape:
     },
     "trace_id": "trace-err-001",
     "request_id": "request-001"
-  }
+  },
+  "warnings": []
 }
 ```
 
@@ -1669,6 +1732,7 @@ HTTP mapping:
 | 403 | `FORBIDDEN` | Authenticated but not allowed for session/project. |
 | 404 | `NOT_FOUND` | Session, turn, event, or trace does not exist. |
 | 409 | `CONFLICT` | Idempotent ID reused with incompatible payload. |
+| 412 | `FAILED_PRECONDITION` | Authenticated request is valid, but a required readiness condition such as evidence availability is not met. |
 | 413 | `PAYLOAD_TOO_LARGE` | Event or batch exceeds configured limits. |
 | 422 | `VALIDATION_ERROR` | Semantically invalid payload or invalid lifecycle state. |
 | 429 | `RATE_LIMITED` | Local queue or provider throttle. |

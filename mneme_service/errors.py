@@ -20,6 +20,7 @@ class MnemeError(HTTPException):
         super().__init__(
             status_code=status_code,
             detail={
+                "ok": False,
                 "error": {
                     "code": code,
                     "message": message,
@@ -27,7 +28,8 @@ class MnemeError(HTTPException):
                     "details": details or {},
                     "trace_id": trace_id,
                     "request_id": request_id,
-                }
+                },
+                "warnings": [],
             },
         )
 
@@ -46,6 +48,10 @@ def not_found(message: str, **details: Any) -> MnemeError:
 
 def conflict(message: str, **details: Any) -> MnemeError:
     return MnemeError(409, "CONFLICT", message, details=details)
+
+
+def failed_precondition(message: str, **details: Any) -> MnemeError:
+    return MnemeError(412, "FAILED_PRECONDITION", message, details=details)
 
 
 def payload_too_large(message: str, **details: Any) -> MnemeError:

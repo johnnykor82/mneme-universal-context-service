@@ -312,6 +312,54 @@ def test_mcp_rest_memory_tool_parity(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
+def test_mcp_and_rest_accept_same_codex_uuid_session_id(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        http, server = await parity_clients(tmp_path)
+        rlm_session_id = "019edb86-1d22-78a3-b9e4-e6121c294056"
+        async with http:
+            session = await http.post(
+                "/v1/sessions/start",
+                json={
+                    "schema_version": "mneme.session.v0",
+                    "session_id": rlm_session_id,
+                    "agent_id": "agent-1",
+                    "runtime": "CODEX_MCP",
+                    "project_id": "/repo/rlm-orchestrator",
+                    "model": "test-model",
+                    "tokenizer": "approx",
+                    "context_window_tokens": 100000,
+                    "cost_mode": "STANDARD",
+                    "started_at": "2026-06-21T12:00:00Z",
+                    "metadata": {"cwd": "/repo/rlm-orchestrator"},
+                },
+            )
+            assert session.status_code == 200, session.text
+            event_payload = {**mcp_event("rlm-event-1", "RLM Orchestrator MVP 1 benchmark evidence project status")}
+            event_payload["session_id"] = rlm_session_id
+            ingested = await http.post(
+                "/v1/events",
+                json={"schema_version": "mneme.event_batch.v0", "session_id": rlm_session_id, "events": [event_payload]},
+            )
+            assert ingested.status_code == 200, ingested.text
+
+            search_payload = {
+                "query": "RLM Orchestrator MVP 1 benchmark evidence project status",
+                "session_id": rlm_session_id,
+                "scope": "SESSION",
+                "top_k": 5,
+            }
+            rest_search = (await http.post("/v1/tools/context_search", json=search_payload)).json()
+            mcp_search = await mcp_call(server, "context_search", search_payload)
+
+            assert rest_search["ok"] is True
+            assert mcp_search["ok"] is True
+            assert [item["event_id"] for item in rest_search["data"]["results"]] == [
+                item["event_id"] for item in mcp_search["data"]["results"]
+            ] == ["rlm-event-1"]
+
+    asyncio.run(scenario())
+
+
 def test_mcp_memory_tools_write_audit_records_and_traces(tmp_path: Path) -> None:
     async def scenario() -> None:
         http, server = await parity_clients(tmp_path)
