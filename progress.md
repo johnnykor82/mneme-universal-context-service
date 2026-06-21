@@ -2382,6 +2382,11 @@
 | Phase 13B final syntax check | `python3 -m py_compile mneme_service/app.py mneme_service/storage.py mneme_service/mcp_server.py mneme_service/tool_names.py mneme_service/codex_setup.py` | Modified Python modules compile | Exit code 0 | pass |
 | Phase 13B git commit | `git commit -m "feat: harden Codex Mneme integration"` | Commit verified integrated state after tests | Created commit `088bbb5` on `main` | pass |
 | Phase 13B git push attempt | `git push origin main` | Push commit to current GitHub remote | Normal sandbox push failed DNS; escalated push was blocked by approval reviewer because `origin` is `johnnykor82/mneme-universal-context-service-internal-quarantine.git` on default branch and needs explicit user approval | blocked |
+| Phase 13B approved git push | `git push origin main` after explicit user approval | Publish commits to current GitHub origin | Pushed `f181868..3c1175b` to `johnnykor82/mneme-universal-context-service-internal-quarantine.git` `main` | pass |
+| Phase 13B global install from GitHub | `/Users/openclaw/.mneme-codex/.venv/bin/python -m pip install --force-reinstall --no-deps "git+ssh://git@github.com/johnnykor82/mneme-universal-context-service-internal-quarantine.git@main"` | Install updated core package into the local global Codex/Mneme venv | Installed `mneme-context-service 0.1.0` from GitHub commit `3c1175b294d54de9a05341d86d4d180b1584ca8f` | pass |
+| Phase 13B installed package verification | Run installed package from `/tmp` and inspect `TOOL_NAMES` | Ensure installed package, not local checkout, exposes new MCP tools | Installed package path is `/Users/openclaw/.mneme-codex/.venv/lib/python3.12/site-packages/mneme_service`; tool names include `resolve_session` and `list_sessions` | pass |
+| Phase 13B daemon restart | `mneme_service.cli codex-service stop/start --install-root /Users/openclaw/.mneme-codex` | Restart global local Mneme daemon on the updated package | Stop succeeded; start bootstrap succeeded while kickstart timed out, but service status showed running on new pid `86676` | pass |
+| Phase 13B REST discovery smoke after install | Authenticated local HTTP smoke to `/v1/capabilities`, `/v1/tools/resolve_session`, and missing-session `get_execution_state` | Verify running daemon exposes and serves the new discovery contract | Capabilities include `resolve_session/list_sessions`; `resolve_session(slug="rlm-orchestrator")` returns `019edb86-1d22-78a3-b9e4-e6121c294056`; `NOT_FOUND` details include discovery tools and candidate session | pass |
 
 ## Error Log
 
@@ -2408,13 +2413,16 @@
 | 2026-06-14 | Pytest could not create temp files because the data volume had only about 116 MiB available and Python found no usable temp directory. | 1 | Inspected disk usage, removed old temporary pytest/electron/log artifacts with approved escalation, then reran tests with `TMPDIR=/private/tmp`. |
 | 2026-06-20 | Global `mneme-codex doctor/status` wrapper returned exit code 127 in the sandbox. | 1 | Inspected global config, wrapper scripts, logs, and SQLite database directly; confirmed daemon config and stored sessions without printing secrets. |
 | 2026-06-20 | `git push origin main` was rejected by approvals reviewer. | 1 | Stop and ask for explicit user approval for pushing commit `088bbb5` to `git@github.com:johnnykor82/mneme-universal-context-service-internal-quarantine.git`; do not work around the policy. |
+| 2026-06-21 | `codex-status` crashed on an existing capture JSONL line with `JSONDecodeError: Extra data`. | 1 | Treated as a separate status/validator robustness issue; used `codex-service status`, health, and direct authenticated REST smoke to verify daemon/update health. |
+| 2026-06-21 | LaunchAgent `kickstart` timed out after bootstrap during daemon restart. | 1 | Checked `codex-service status` and `/v1/health`; service was running on pid `86676`, so restart was considered successful. |
+| 2026-06-21 | Python/httpx local REST smoke was blocked by sandbox with `Operation not permitted`. | 1 | Re-ran the same local HTTP smoke with approval; capabilities and session discovery passed without printing tokens. |
 
 ## 5-Question Reboot Check
 
 | Question | Answer |
 |---|---|
-| Where am I? | Phase 13B Codex/MCP session discovery hotfix is complete in the working tree: REST/MCP now expose `resolve_session` and `list_sessions`, and docs/skill tell agents not to guess `session_id`. |
-| Where am I going? | Next: finish full verification, review the diff, commit, and push the update to GitHub; then reinstall/restart the global Codex MCP environment so the running tools include discovery. |
+| Where am I? | Phase 13B Codex/MCP session discovery hotfix is pushed to GitHub and installed into the global local `/Users/openclaw/.mneme-codex` environment. The running daemon exposes `resolve_session` and `list_sessions`. |
+| Where am I going? | Next: open/restart a Codex session so the MCP stdio tool registry is reloaded and the new tool names become visible to the model in the UI/tool list. |
 | What is the goal? | Create a vendor-neutral Mneme context service any agent runtime can integrate through a clear REST/MCP contract. |
 | What have I learned? | See `findings.md` for requirements, technical decisions, issues, resources, and open questions. |
 | What have I done? | Completed concept, architecture diagram, implementation path, API/MCP contract, Host Adapter Contract v0, Milestone 1 daemon MVP, Milestone 2 MCP substrate, Milestone 3 offline/reference Codex transcript ingestion MVP, Codex MCP dogfood setup, Phase 14 parity recovery, Phase 14B/14C hardening/parity, Phase 15 publication prep, Phase 13 Codex hook dogfood, and Phase 13B session discovery hotfix. |

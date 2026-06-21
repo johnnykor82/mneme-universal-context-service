@@ -7,7 +7,7 @@ Turn the idea behind `hermes-mneme` into a vendor-neutral context-management ser
 ## Current Phase
 
 Phase 13: Codex memory dogfood and knowledge-base workflow - in progress; next focus is updated global Codex install rehearsal on the second machine.
-Phase 13B: Codex/MCP session discovery hotfix - complete; next action is publish updated core package so global Codex MCP sees `resolve_session` and `list_sessions`.
+Phase 13B: Codex/MCP session discovery hotfix - complete; pushed to GitHub and installed into the global local Codex/Mneme environment.
 Phase 14C: full Hermes-Mneme parity completion - complete.
 Phase 14B: parity hardening while Hermes PR is pending - complete.
 Phase 16: Hermes host adapter planning - deferred until upstream Hermes context-engine hook PR is accepted.

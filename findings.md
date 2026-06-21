@@ -693,9 +693,11 @@
   returned `ok=true`, and `context_search` found RLM Orchestrator task/README
   evidence.
 - Operational caveat: the running Codex MCP uses the installed
-  `mneme-context-service` wheel in `/Users/openclaw/.mneme-codex/.venv`. Source
-  changes in this repo will not appear in current Codex MCP tools until the
-  package is reinstalled/published and Codex/MCP is restarted.
+  `mneme-context-service` wheel in `/Users/openclaw/.mneme-codex/.venv`.
+  The package is now reinstalled from GitHub commit `3c1175b` and the REST
+  daemon is restarted, but an already-open Codex session may still need a new
+  thread or MCP/Codex restart before the UI/tool registry lists newly added MCP
+  tools.
 
 ## Issues Encountered
 
