@@ -107,7 +107,15 @@ def test_lineage_carry_over_searches_parent_without_copying_events(tmp_path: Pat
         json={"session_id": "session-child", "query": "legacy parser", "scope": "SESSION", "top_k": 5},
     )
     assert search.status_code == 200, search.text
-    results = search.json()["data"]["results"]
+    assert search.json()["data"]["results"] == []
+
+    lineage_search = api.post(
+        "/v1/tools/context_search",
+        headers=auth_headers(),
+        json={"session_id": "session-child", "query": "legacy parser", "scope": "LINEAGE", "top_k": 5},
+    )
+    assert lineage_search.status_code == 200, lineage_search.text
+    results = lineage_search.json()["data"]["results"]
     assert [item["event_id"] for item in results] == ["event-parent"]
 
     fetched = api.post(

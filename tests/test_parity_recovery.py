@@ -234,7 +234,7 @@ def test_provider_pipeline_recovers_semantic_reranked_enriched_context_without_s
     assert search["data"]["results"][0]["event_id"] == "event-oauth"
     assert search["data"]["results"][0]["reason"] == "RERANKED"
     trace = api.get(f"/v1/traces/{search['trace_id']}", headers=auth_headers()).json()
-    assert trace["retrieval"]["strategies"] == ["VECTOR", "KEYWORD", "RECENCY", "RERANK"]
+    assert trace["retrieval"]["strategies"] == ["VECTOR", "KEYWORD", "RECENCY", "GRAPH_DEPENDENCY", "RERANK"]
     assert trace["retrieval"]["degraded"] is False
 
     state = tool(api, "get_execution_state", {"session_id": "session-provider"})["data"]
@@ -354,8 +354,8 @@ def test_state_segments_resume_lineage_and_budgeted_prepare_survive_restart(tmp_
                 "include_recent_tail": True,
                 "budget_split": {
                     "execution_state_ratio": 0.20,
-                    "retrieved_context_ratio": 0.25,
-                    "recent_tail_ratio": 0.45,
+                    "retrieved_evidence_ratio": 0.25,
+                    "protected_tail_ratio": 0.45,
                     "headroom_ratio": 0.10,
                 },
                 "retrieval": {"query": "pytest passed budgeted", "top_k": 5},

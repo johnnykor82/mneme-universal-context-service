@@ -81,9 +81,19 @@ def run_local_benchmark(*, event_count: int = 30, db_path: Path | None = None) -
     retrieval_body = retrieval.json()
     prepared_body = prepared.json()
     costs_body = costs.json()
+    retrieval_results = retrieval_body["data"]["results"]
+    relevant_event_ids = benchmark_relevant_event_ids(event_count)
+    quality_report = benchmark_quality_report(
+        query="oauth refresh verifier",
+        top_k=5,
+        retrieved_event_ids=[str(result["event_id"]) for result in retrieval_results],
+        relevant_event_ids=relevant_event_ids,
+        event_count=event_count,
+    )
     return {
         "schema_version": "mneme.benchmark_report.v0",
         "mode": "LOCAL_FAKE_PROVIDERS",
+        "methodology": benchmark_methodology(),
         "db_path": str(resolved_db),
         "session_id": session_id,
         "event_count": event_count,
@@ -94,10 +104,11 @@ def run_local_benchmark(*, event_count: int = 30, db_path: Path | None = None) -
             "rejected": len(ingest_body.get("rejected", [])),
         },
         "retrieval": {
-            "result_count": len(retrieval_body["data"]["results"]),
+            "result_count": len(retrieval_results),
             "strategies": retrieval_body.get("data", {}).get("retrieval", {}).get("strategies", []),
             "trace_id": retrieval_body.get("trace_id"),
         },
+        "quality_report": quality_report,
         "context_prepare": {
             "changed": prepared_body["changed"],
             "message_count": len(prepared_body["messages"]),
@@ -118,8 +129,74 @@ def run_local_benchmark(*, event_count: int = 30, db_path: Path | None = None) -
     }
 
 
+def benchmark_methodology() -> dict[str, str]:
+    return {
+        "benchmark_type": "LOCAL_SMOKE",
+        "providers": "LOCAL_FAKE_PROVIDERS",
+        "corpus": "SYNTHETIC_LABELED",
+        "comparative_baseline": "NOT_RUN",
+        "token_reduction_claim": "NOT_CLAIMED",
+        "cost_reduction_claim": "NOT_CLAIMED",
+        "token_estimate_methodology": "SERVICE_COST_COUNTERS",
+    }
+
+
+def benchmark_relevant_event_ids(event_count: int) -> set[str]:
+    return {f"benchmark-event-{index:04d}" for index in range(event_count) if benchmark_is_relevant(index)}
+
+
+def benchmark_is_relevant(index: int) -> bool:
+    event_type, _, text = benchmark_event_shape(index)
+    return event_type in {"USER_MESSAGE", "TOOL_CALL", "TOOL_OUTPUT"} and all(
+        term in text.lower() for term in ("oauth", "verifier")
+    )
+
+
+def benchmark_quality_report(
+    *,
+    query: str,
+    top_k: int,
+    retrieved_event_ids: list[str],
+    relevant_event_ids: set[str],
+    event_count: int,
+) -> dict[str, Any]:
+    retrieved_set = set(retrieved_event_ids)
+    true_positive = len(retrieved_set & relevant_event_ids)
+    false_positive = len(retrieved_set - relevant_event_ids)
+    false_negative = len(relevant_event_ids - retrieved_set)
+    true_negative = max(0, event_count - true_positive - false_positive - false_negative)
+    reciprocal_rank = 0.0
+    for rank, event_id in enumerate(retrieved_event_ids, start=1):
+        if event_id in relevant_event_ids:
+            reciprocal_rank = round(1 / rank, 6)
+            break
+
+    precision_at_k = true_positive / len(retrieved_event_ids) if retrieved_event_ids else 0.0
+    recall_at_k = true_positive / len(relevant_event_ids) if relevant_event_ids else 0.0
+    return {
+        "schema_version": "mneme.benchmark_quality_report.v0",
+        "label_source": "SYNTHETIC_CORPUS",
+        "query": query,
+        "k": top_k,
+        "retrieved_event_ids": retrieved_event_ids,
+        "relevant_event_ids": sorted(relevant_event_ids),
+        "metrics": {
+            "precision_at_k": round(precision_at_k, 6),
+            "recall_at_k": round(recall_at_k, 6),
+            "mrr": reciprocal_rank,
+        },
+        "confusion_counts": {
+            "true_positive": true_positive,
+            "false_positive": false_positive,
+            "false_negative": false_negative,
+            "true_negative": true_negative,
+        },
+    }
+
+
 def elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 3)
+
 
 
 def benchmark_session(session_id: str) -> dict[str, Any]:
@@ -197,8 +274,8 @@ def benchmark_prepare_request(session_id: str) -> dict[str, Any]:
             "retrieval": {"query": "oauth refresh verifier", "top_k": 8},
             "budget_split": {
                 "execution_state_ratio": 0.10,
-                "retrieved_context_ratio": 0.35,
-                "recent_tail_ratio": 0.45,
+                "retrieved_evidence_ratio": 0.35,
+                "protected_tail_ratio": 0.45,
                 "headroom_ratio": 0.10,
             },
         },

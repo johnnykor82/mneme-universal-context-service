@@ -148,8 +148,9 @@ prompt/context replacement.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/v1/health` | Local daemon readiness and version check. |
+| `GET` | `/v1/health` | Local daemon liveness and version check; does not prove authenticated tool usability. |
 | `GET` | `/v1/capabilities` | Discover enabled modes, providers, limits, and supported schema versions. |
+| `POST` | `/v1/readiness/session` | Authenticated cheap check that a session exists and, when required, can return evidence. |
 | `POST` | `/v1/sessions/start` | Create or resume a session. |
 | `POST` | `/v1/events` | Ingest one or more normalized events. |
 | `POST` | `/v1/turns/complete` | Mark a turn finalized and attach usage/status. |
@@ -161,6 +162,8 @@ These mirror MCP tools so non-MCP runtimes can use the same memory operations.
 
 | Method | Path | Purpose |
 |---|---|---|
+| `POST` | `/v1/tools/resolve_session` | Resolve a known id, project path, thread id, slug, or query into a valid internal session id. |
+| `POST` | `/v1/tools/list_sessions` | List bounded session summaries for discovery and ambiguity resolution. |
 | `POST` | `/v1/tools/context_search` | Search prior events/segments. |
 | `POST` | `/v1/tools/fetch_event` | Fetch raw event evidence. |
 | `POST` | `/v1/tools/expand_context` | Expand from an event through causal, temporal, tool-chain, or segment edges. |
@@ -178,12 +181,7 @@ These mirror MCP tools so non-MCP runtimes can use the same memory operations.
 | `GET` | `/v1/costs/session/{session_id}` | Fetch cost and overhead report for a session. |
 | `GET` | `/v1/sessions/{session_id}/export` | Export stored session data for inspection or migration. |
 | `DELETE` | `/v1/sessions/{session_id}` | Delete a session and derived indexes. |
-
-### Optional Observability Endpoint
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/v1/metrics` | Optional Prometheus-style local metrics for daemon diagnostics. |
+| `GET` | `/v1/metrics` | Local metrics for daemon diagnostics and benchmark/production visibility. |
 
 ## Typical Lifecycle
 
@@ -234,14 +232,30 @@ Response:
   "supports_llm_enrichment": false,
   "supports_context_prepare": true,
   "supports_mcp_tools": true,
+  "supports_session_readiness": true,
+  "supports_blob_store": true,
+  "supports_blob_range_reads": true,
+  "supports_export_bundle": true,
+  "supported_export_formats": ["json", "tar_bundle"],
+  "supports_metrics": true,
+  "metrics_format": "prometheus",
   "auth_schemes": ["BEARER_TOKEN", "UNIX_SOCKET"],
   "max_batch_events": 200,
   "max_event_content_bytes": 1048576,
+  "max_blob_bytes": 2097152,
+  "max_batch_total_blob_bytes": 20971520,
+  "max_multipart_transaction_bytes": 20971520,
+  "max_export_blob_inline_bytes": 0,
+  "max_export_session_memory_bytes": 33554432,
   "max_tool_result_events": 50,
   "supported_schema_versions": {
     "session": ["mneme.session.v0"],
+    "session_start": ["mneme.session_start.v0"],
+    "session_export": ["mneme.session_export.v0"],
+    "session_export_manifest": ["mneme.session_export_manifest.v0"],
     "event_batch": ["mneme.event_batch.v0"],
     "event": ["mneme.event.v0"],
+    "event_summary": ["mneme.event_summary.v0"],
     "turn": ["mneme.turn.v0"],
     "context_prepare_request": ["mneme.context_prepare_request.v0"],
     "context_prepare_response": ["mneme.context_prepare_response.v0"],
@@ -252,10 +266,69 @@ Response:
     "session_lineage": ["mneme.session_lineage.v0"],
     "graph_edge": ["mneme.graph_edge.v0"],
     "execution_state": ["mneme.execution_state.v0"],
-    "state_history_entry": ["mneme.state_history_entry.v0"]
+    "state_history_entry": ["mneme.state_history_entry.v0"],
+    "segment": ["mneme.segment.v0"],
+    "segment_start": ["mneme.segment_start.v0"],
+    "segment_close": ["mneme.segment_close.v0"],
+    "blob": ["mneme.blob.v0"],
+    "reindex_job": ["mneme.reindex_job.v0"]
   }
 }
 ```
+
+### `POST /v1/readiness/session`
+
+Purpose: fail closed at run start when Mneme is unavailable, the REST token is
+missing/invalid, the session id is unknown, or required evidence is absent.
+This endpoint is authenticated and should be preferred over `/v1/health` for
+hard-dependency clients.
+
+Request:
+
+```json
+{
+  "session_id": "019edb86-1d22-78a3-b9e4-e6121c294056",
+  "query": "project benchmark evidence status",
+  "require_evidence": true,
+  "top_k": 1,
+  "scope": "SESSION"
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "ready": true,
+    "session_id": "019edb86-1d22-78a3-b9e4-e6121c294056",
+    "required_check": "context_search",
+    "evidence_count": 1,
+    "evidence_event_ids": ["event-123"],
+    "checks": {
+      "authenticated": true,
+      "session_found": true,
+      "evidence_found": true
+    }
+  },
+  "trace_id": "trace-readiness-001",
+  "warnings": []
+}
+```
+
+Missing or invalid tokens return `401 UNAUTHENTICATED`. Unknown session ids
+return `404 NOT_FOUND` with discovery guidance. When `require_evidence=true`
+and the session exists but no evidence is returned, the service returns
+`412 FAILED_PRECONDITION` with `details.reason=NO_EVIDENCE`.
+
+Compatibility note: if an already-running alpha daemon has not yet deployed
+`/v1/readiness/session`, hard-dependency clients may
+temporarily call authenticated `POST /v1/tools/context_search` with `top_k=1`
+as a migration-only run-start gate after `/v1/capabilities` or version metadata
+shows that readiness is unsupported. This fallback is not v0 compliant daemon
+behavior and must still distinguish `401` authentication failure, `404` missing
+session/tool failure, and `200 ok=true` with zero results/no evidence.
 
 ### `POST /v1/sessions/start`
 
@@ -441,7 +514,7 @@ Validation rules:
   canonical transcript event.
 - If `policy.include_recent_tail=true` and the request exceeds the allowed
   budget, the service should preserve the system prompt when requested and keep
-  a contiguous recent-tail suffix under `budget_split.recent_tail_ratio`.
+  a contiguous recent-tail suffix under `budget_split.protected_tail_ratio`.
   `trace.protected_tail_tokens` reports the token estimate for the protected
   non-system tail.
 - After independently packing state, retrieved context, and recent tail, the
@@ -490,8 +563,8 @@ Request:
     "headroom_ratio": 0.1,
     "budget_split": {
       "execution_state_ratio": 0.05,
-      "retrieved_context_ratio": 0.3,
-      "recent_tail_ratio": 0.55,
+      "retrieved_evidence_ratio": 0.3,
+      "protected_tail_ratio": 0.55,
       "headroom_ratio": 0.1
     },
     "retrieval": {
@@ -546,7 +619,9 @@ Response:
     "execution_state_tokens": 7000,
     "protected_tail_tokens": 52000,
     "retrieved_tokens": 31000,
-    "headroom_tokens": 14000,
+    "minimum_headroom_tokens": 14000,
+    "unused_context_slack_tokens": 1200,
+    "latest_user_message_preserved": true,
     "candidate_count": 24,
     "selected_event_ids": ["event-010", "event-011"],
     "selected_event_refs": [
@@ -609,7 +684,14 @@ REST tool responses use the shared tool envelope:
 ```
 
 Tool failures use the normal REST status code plus the standard REST error
-envelope. MCP tools use the MCP result envelope described below.
+envelope. REST and MCP session-bound tools accept the same Mneme `session_id`
+value; `019edb86-1d22-78a3-b9e4-e6121c294056` is an example of the external
+Codex/Mneme session id format accepted by both surfaces. MCP tools use the MCP
+result envelope described below.
+
+MCP success does not imply unauthenticated REST success. The MCP process may
+proxy REST with a configured bearer token such as `MNEME_AUTH_TOKEN`; direct
+REST clients must send their own valid token.
 
 ## Core Schemas
 
@@ -801,7 +883,7 @@ Turn status values:
   "session_id": "session-123",
   "turn_id": "turn-456",
   "agent_id": "agent-name",
-  "runtime": "GENERIC_MCP",
+  "runtime": "CODEX_MCP",
   "role": "TOOL",
   "type": "TOOL_OUTPUT",
   "timestamp": "2026-06-08T12:00:00Z",
@@ -900,10 +982,11 @@ final message is unavailable or the caller explicitly asks for chunks.
 ```json
 {
   "format": "BYTES_REF",
-  "uri": "file:///local/mneme/blobs/blob-123",
+  "uri": "mneme-blob://blob-123",
   "hash": "sha256:example",
-  "size_bytes": 10485760,
-  "media_type": "text/plain"
+  "size_bytes": 2097152,
+  "media_type": "text/plain",
+  "storage_owner": "SERVER"
 }
 ```
 
@@ -1228,6 +1311,109 @@ Failure:
 }
 ```
 
+### `resolve_session`
+
+Purpose: find a valid internal Mneme `session_id` before calling
+session-bound memory tools. Agents must use this tool when the user or host has
+not supplied a trusted session id.
+
+Input:
+
+```json
+{
+  "session_id": null,
+  "project_path": "/repo/my-project",
+  "thread_id": "codex-thread-id",
+  "slug": "my-project",
+  "query": "my project",
+  "limit": 10
+}
+```
+
+At least one of `session_id`, `project_path`, `thread_id`, `slug`, or `query`
+must be supplied. If `session_id` exists exactly, resolution should return it
+without requiring a search.
+
+Output data:
+
+```json
+{
+  "resolved_session_id": "session-123",
+  "resolution": "SINGLE_MATCH",
+  "matches": [
+    {
+      "session_id": "session-123",
+      "agent_id": "codex",
+      "runtime": "CODEX",
+      "project_id": "/repo/my-project",
+      "started_at": "2026-06-20T12:00:00Z",
+      "created_at_ms": 1781966400000,
+      "metadata": {
+        "cwd": "/repo/my-project",
+        "thread_id": "codex-thread-id"
+      },
+      "event_count": 42,
+      "turn_count": 8,
+      "latest_event_timestamp": "2026-06-20T12:30:00Z"
+    }
+  ]
+}
+```
+
+Resolution values:
+
+- `EXACT_SESSION_ID`
+- `SINGLE_MATCH`
+- `AMBIGUOUS`
+- `NOT_FOUND`
+
+`AMBIGUOUS` and `NOT_FOUND` are recoverable tool outcomes and should return
+`ok=true` with warnings, not transport-level failures.
+
+### `list_sessions`
+
+Purpose: list bounded session summaries for discovery and ambiguity resolution.
+This tool is for selecting a valid session id, not for reading event content.
+
+Input:
+
+```json
+{
+  "query": "my-project",
+  "project_path": "/repo/my-project",
+  "thread_id": null,
+  "slug": null,
+  "limit": 20
+}
+```
+
+Output data:
+
+```json
+{
+  "sessions": [
+    {
+      "session_id": "session-123",
+      "agent_id": "codex",
+      "runtime": "CODEX",
+      "project_id": "/repo/my-project",
+      "started_at": "2026-06-20T12:00:00Z",
+      "metadata": {
+        "cwd": "/repo/my-project"
+      },
+      "event_count": 42,
+      "turn_count": 8,
+      "latest_event_timestamp": "2026-06-20T12:30:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+Session summaries must be bounded and redacted. They should expose only fields
+needed to identify the right session, such as `session_id`, runtime, project id,
+safe adapter metadata, counts, and latest event timestamp.
+
 ### `context_search`
 
 Purpose: find relevant events and segments.
@@ -1541,6 +1727,7 @@ REST errors must use this shape:
 
 ```json
 {
+  "ok": false,
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "Invalid event payload.",
@@ -1551,7 +1738,8 @@ REST errors must use this shape:
     },
     "trace_id": "trace-err-001",
     "request_id": "request-001"
-  }
+  },
+  "warnings": []
 }
 ```
 
@@ -1564,11 +1752,27 @@ HTTP mapping:
 | 403 | `FORBIDDEN` | Authenticated but not allowed for session/project. |
 | 404 | `NOT_FOUND` | Session, turn, event, or trace does not exist. |
 | 409 | `CONFLICT` | Idempotent ID reused with incompatible payload. |
+| 412 | `FAILED_PRECONDITION` | Authenticated request is valid, but a required readiness condition such as evidence availability is not met. |
 | 413 | `PAYLOAD_TOO_LARGE` | Event or batch exceeds configured limits. |
 | 422 | `VALIDATION_ERROR` | Semantically invalid payload or invalid lifecycle state. |
 | 429 | `RATE_LIMITED` | Local queue or provider throttle. |
 | 503 | `PROVIDER_UNAVAILABLE` | Optional embedding/rerank/enrichment provider unavailable. |
 | 500 | `INTERNAL_ERROR` | Unexpected service failure. |
+
+For missing sessions, `details` should distinguish an actually unknown internal
+id from an agent-supplied alias/slug by returning at least:
+
+```json
+{
+  "session_id": "rlm-orchestrator",
+  "reason": "SESSION_ID_NOT_FOUND",
+  "hint": "Do not guess Mneme session_id. Call resolve_session with project_path/thread_id/slug or list_sessions to find a valid session.",
+  "discovery_tools": ["resolve_session", "list_sessions"],
+  "candidate_sessions": []
+}
+```
+
+`candidate_sessions` must be bounded and redacted.
 
 Idempotency rules:
 
@@ -1817,9 +2021,12 @@ control over Codex internal prompt assembly.
 
 v0 strategy:
 
-- Provide an MCP server with `context_search`, `fetch_event`, `expand_context`,
-  `list_segments`, `get_execution_state`, `get_goal_history`, `recall_recent`,
+- Provide an MCP server with `resolve_session`, `list_sessions`,
+  `context_search`, `fetch_event`, `expand_context`, `list_segments`,
+  `get_execution_state`, `get_goal_history`, `recall_recent`,
   `explain_context`, and `mneme_cost_report`.
+- Teach agents to call `resolve_session` or `list_sessions` before
+  session-bound tools when the valid internal Mneme `session_id` is unknown.
 - Package Codex plugin/skill guidance that teaches when to call Mneme tools.
 - Use feature-detected session/turn logging hooks only where available.
 - Do not claim automatic context replacement unless a runtime exposes a supported hook.
@@ -1876,8 +2083,8 @@ These are review tasks, not unresolved protocol blockers:
    Hermes, Codex/MCP, LangGraph, and OpenAI Agents SDK adapters.
 2. Confirm whether `max_event_content_bytes=1048576` is an acceptable default
    for the reference daemon or should be lowered for safer local operation.
-3. Confirm whether `/v1/metrics` should stay optional in v0 or become required
-   for benchmark and demo diagnostics.
+3. Confirm whether the standalone v0.6 exporter requirements should fully
+   replace this older contract file before the next implementation pass.
 
 ## Implementation Gate
 

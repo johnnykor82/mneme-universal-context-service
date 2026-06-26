@@ -33,14 +33,13 @@ enabled = false
 
 No provider network calls should be made in this mode.
 
-Minimal mode is not the recommended mode for production-like semantic memory.
-Real semantic memory
+Minimal mode is not the dogfood/public-readiness mode. Real semantic memory
 requires embeddings because semantic search, topic centroids, and drift
 detection depend on stored vectors. In short: semantic memory requires embeddings.
 
 ## Required Embeddings Mode
 
-For production-like usage, require embeddings so the daemon fails
+For dogfood or production-like usage, require embeddings so the daemon fails
 fast instead of silently running keyword-only memory:
 
 ```toml
@@ -62,8 +61,8 @@ mneme serve --require-embeddings --embeddings-enabled ...
 ```
 
 `GET /v1/capabilities` should report both `supports_embeddings: true` and
-`requires_embeddings: true` for this mode. For release validation, ingest a real
-event and verify `embedding_items > 0` and
+`requires_embeddings: true` for this mode. Before publication or adapter
+rehearsal, ingest a real event and verify `embedding_items > 0` and
 `embedding_failures == 0` in the session cost report.
 
 ## Embeddings
@@ -112,7 +111,7 @@ export MNEME_RERANKER_API_KEY="<secret>"
 Reranker failures preserve the original retrieval order and are reflected in
 trace fallback metadata and cost-report failure counters.
 
-For production-like verification, run a real `context_search` and
+For dogfood/public-readiness verification, run a real `context_search` and
 confirm `reranker_calls > 0` with `reranker_failures == 0` when the configured
 reranker is expected to be available.
 
@@ -152,8 +151,9 @@ daemon can enrich structured execution state; it is not a separate natural-langu
 publish an answer-synthesis claim unless that path is implemented and verified
 with a real provider.
 
-Run a real-provider smoke before claiming live LLM enrichment readiness in a
-release.
+The current local dogfood daemon has embeddings and reranker configured, but no
+LLM enrichment provider enabled. Keep LLM real-provider smoke as a publication
+gate only when the release claims live LLM enrichment readiness.
 
 ## Privacy
 

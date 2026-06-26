@@ -7,8 +7,8 @@ db_path = ".local/mneme.db"
 host = "127.0.0.1"
 port = 8765
 insecure_dev = false
-# Keep false for local dev/CI minimal mode. Set true for production-like
-# semantic memory so the daemon fails fast if embeddings are not configured.
+# Keep false for local dev/CI minimal mode. Set true for dogfood or production-
+# like semantic memory so the daemon fails fast if embeddings are not configured.
 require_embeddings = false
 max_batch_events = 200
 max_event_content_bytes = 1048576
@@ -36,6 +36,15 @@ router_min_candidates = 12
 dependency_max_depth = 4
 dependency_decay = 0.6
 reranker_top_k = 0
+
+[retrieval.routing]
+default_mode = "general"
+
+[retrieval.routing.weights.general]
+semantic_similarity = 0.40
+recency = 0.20
+dependency = 0.30
+type_weight = 0.10
 
 [enrichment]
 every_n_turns = 5

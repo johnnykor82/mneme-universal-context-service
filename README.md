@@ -34,6 +34,16 @@ Mneme has two integration modes:
 See [MNEME_HOST_ADAPTER_CONTRACT_V0.md](MNEME_HOST_ADAPTER_CONTRACT_V0.md) for
 the host adapter contract.
 
+## Specification
+
+For architecture/code review, send
+[docs/MNEME_STANDALONE_SPEC.md](docs/MNEME_STANDALONE_SPEC.md). It is the
+single-file reviewer specification and does not require attaching the rest of
+the documentation set.
+
+[docs/MNEME_DEVELOPMENT_SPEC.md](docs/MNEME_DEVELOPMENT_SPEC.md) remains a
+historical/index-style specification from the earlier review pass.
+
 ## Quick Start
 
 Current source-checkout install:
@@ -43,7 +53,7 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[test]"
 export MNEME_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-mneme serve --db .local/mneme.db --token "$MNEME_AUTH_TOKEN"
+mneme serve --db .local/mneme.db
 ```
 
 Health check:
@@ -52,10 +62,21 @@ Health check:
 curl -sS http://127.0.0.1:8765/v1/health
 ```
 
+`/v1/health` is a liveness check only. REST clients that require Mneme
+evidence at run start should use the same token as the daemon/MCP process and
+call authenticated session readiness:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8765/v1/readiness/session \
+  -H "Authorization: Bearer $MNEME_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"example-session","query":"project status and next action","require_evidence":true,"top_k":1}'
+```
+
 Run the MCP server as a separate process pointing at the daemon:
 
 ```bash
-mneme mcp --base-url http://127.0.0.1:8765 --token "$MNEME_AUTH_TOKEN"
+mneme mcp --base-url http://127.0.0.1:8765
 ```
 
 ## Configuration
@@ -64,7 +85,7 @@ Start from [mneme.example.toml](mneme.example.toml):
 
 ```bash
 cp mneme.example.toml mneme.toml
-mneme serve --config mneme.toml --token "$MNEME_AUTH_TOKEN"
+mneme serve --config mneme.toml
 ```
 
 Provider secrets should come from environment variables, not tracked config:
@@ -79,13 +100,16 @@ For installation details, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
 ## Host Adapters
 
-This repository contains the Mneme engine/core only. Runtime-specific adapters
-should live in separate packages or repositories and connect to Mneme through
-the REST/MCP contracts. MCP gives tool-capable hosts agent-callable memory
-tools; automatic request-context assembly requires a host lifecycle hook as
-defined in [MNEME_HOST_ADAPTER_CONTRACT_V0.md](MNEME_HOST_ADAPTER_CONTRACT_V0.md).
+This repository's primary package is the Mneme engine/core. Runtime-specific
+adapters connect to Mneme through the REST/MCP contracts. MCP gives
+tool-capable hosts agent-callable memory tools; automatic request-context
+assembly requires a host lifecycle hook as defined in
+[MNEME_HOST_ADAPTER_CONTRACT_V0.md](MNEME_HOST_ADAPTER_CONTRACT_V0.md).
 
-Codex Desktop users should install the separate adapter:
+The repository also carries Codex reference docs and helper code used by the
+current compatibility tests. Codex Desktop users should prefer the separate
+adapter package for installation:
+
 [johnnykor82/mneme-codex-adapter](https://github.com/johnnykor82/mneme-codex-adapter).
 
 ## Tests
@@ -121,13 +145,15 @@ Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 ## Project Status
 
-The current test suite covers provider configuration, embeddings, model-change
+Mneme v0 compliance work targets
+[docs/MNEME_STANDALONE_SPEC.md](docs/MNEME_STANDALONE_SPEC.md). The current
+test suite covers provider configuration, embeddings, model-change
 reindex, hybrid/global retrieval, execution state recovery, segmentation/session
 drift, typed graph scoring, budgeted context assembly, optional reranking,
 optional LLM enrichment, MCP parity, and parity acceptance behavior.
 
 ## Publication Gate
 
-This repository is the clean public engine/core surface. Internal planning
-files, local development notes, and host-specific adapter code are intentionally
-not included.
+This repository keeps internal planning files, local development notes, and
+unrelated project artifacts out of the public history. Host-specific adapter
+release packaging remains separate from the core service package.

@@ -22,7 +22,13 @@ def update_segment_for_event(store: Store, event: dict[str, Any], classification
         closed["status"] = "CLOSED"
         closed["updated_at"] = event["timestamp"]
         store.put_segment(closed)
-        drift_reason = "EXPLICIT_SWITCH" if intent == INTENT_SWITCH else "EMBEDDING_DRIFT"
+        signals = classification.get("signals") if isinstance(classification.get("signals"), dict) else {}
+        if intent == INTENT_SWITCH:
+            drift_reason = "EXPLICIT_SWITCH"
+        elif signals.get("tool_domain_shift_trusted") is True:
+            drift_reason = "TOOL_DOMAIN_SHIFT"
+        else:
+            drift_reason = "EMBEDDING_DRIFT"
         segment = _new_segment(store, event, drift_reason=drift_reason)
         store.put_segment(segment)
         return segment
@@ -52,5 +58,6 @@ def _new_segment(store: Store, event: dict[str, Any], *, drift_reason: str) -> d
         "created_at": event["timestamp"],
         "updated_at": event["timestamp"],
         "anchor_event_ids": [event["event_id"]],
+        "created_by": "AUTOMATIC",
         "drift_reason": drift_reason,
     }
