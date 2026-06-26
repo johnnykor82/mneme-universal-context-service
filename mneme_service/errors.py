@@ -42,6 +42,10 @@ def unauthenticated() -> MnemeError:
     return MnemeError(401, "UNAUTHENTICATED", "Missing or invalid authentication.")
 
 
+def forbidden(message: str, **details: Any) -> MnemeError:
+    return MnemeError(403, "FORBIDDEN", message, details=details)
+
+
 def not_found(message: str, **details: Any) -> MnemeError:
     return MnemeError(404, "NOT_FOUND", message, details=details)
 
@@ -56,6 +60,26 @@ def failed_precondition(message: str, **details: Any) -> MnemeError:
 
 def payload_too_large(message: str, **details: Any) -> MnemeError:
     return MnemeError(413, "PAYLOAD_TOO_LARGE", message, details=details)
+
+
+def unsupported_media_type(message: str, **details: Any) -> MnemeError:
+    return MnemeError(415, "UNSUPPORTED_MEDIA_TYPE", message, details=details)
+
+
+def range_not_satisfiable(message: str, **details: Any) -> MnemeError:
+    return MnemeError(416, "RANGE_NOT_SATISFIABLE", message, details=details)
+
+
+def rate_limited(message: str, **details: Any) -> MnemeError:
+    return MnemeError(429, "RATE_LIMITED", message, retryable=True, details=details)
+
+
+def provider_unavailable(message: str, **details: Any) -> MnemeError:
+    return MnemeError(503, "PROVIDER_UNAVAILABLE", message, retryable=True, details=details)
+
+
+def storage_busy(message: str, **details: Any) -> MnemeError:
+    return MnemeError(503, "STORAGE_BUSY", message, retryable=True, details=details)
 
 
 def validation_error(message: str, **details: Any) -> MnemeError:

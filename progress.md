@@ -1,5 +1,507 @@
 # Progress Log: Mneme Universal Context Service
 
+## 2026-06-22 - RLM Orchestrator v0.4.4 Implementation Audit Gate
+
+- Performed a read-only implementation audit of
+  `/Users/openclaw/.hermes/plugins/_rlm-orchestrator` against the accepted
+  v0.4.4 contract.
+- Read target `AGENTS.md`, `task_plan.md`, `findings.md`, `progress.md`, and
+  inspected Phase 16-19 implementation files: `budget.py`, `workers.py`,
+  `controller.py`, `workspace.py`, `schemas.py`, `cli.py`, `config.py`,
+  `model_provider.py`, plus focused tests.
+- Audit disposition: `BLOCK_MVP2_IMPLEMENTATION_REMEDIATION`.
+- Main blockers recorded in `findings.md`:
+  - no persisted append-only `budget_ledger.jsonl` transition log;
+  - JSON state writes are in-place and JSONL recovery is absent;
+  - worker evidence refs still use `source_id`, not `evidence_id`;
+  - resume does not reconcile worker results, ledger, and steps;
+  - no synthetic `ABANDONED` step/progress records;
+  - doctor diagnostics do not match v0.4.4;
+  - verifier statuses/reserve/no-trigger handling do not match v0.4.4;
+  - lease deadlines/two-phase finalization and late-response discard are absent;
+  - task/evidence fingerprints and structured warning objects are absent.
+- Updated `task_plan.md` to mark Phase 21 blocked on remediation. No runtime
+  code was changed and no MVP 2 feature work was started.
+
+## 2026-06-22 - RLM Orchestrator v0.4.4 Review Fixes
+
+- Read the latest v0.4.3 full-roadmap review responses. Overall disposition
+  remains `APPROVE_FULL_ROADMAP_WITH_FIXES`; reviewers reported no blocking
+  ambiguities for MVP 2, but requested bounded fixes before implementation
+  audit.
+- Updated `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` to v0.4.4:
+  - added required `budget_ledger.jsonl` field names, example JSON, and
+    `SCHEMA_INVALID` reservation status support;
+  - required verifier reserve persistence through the ledger;
+  - required synthetic `ABANDONED` step/progress records during resume
+    reconciliation;
+  - required resume-time worker evidence-ref revalidation against the accepted
+    evidence store;
+  - clarified ledger-authoritative conflict handling for finalized
+    `TIMED_OUT`/`ABANDONED` workers;
+  - replaced ambiguous `PARTIAL` auto-resume language with explicit
+    caller-driven resume semantics;
+  - made `doctor` stdout JSON diagnostics mandatory and added
+    `diagnostics_schema_version`;
+  - added `model_routing_stability` enum validation, warning-field semantics,
+    verifier status/no-trigger skip behavior, late model-response discard, and
+    schema-upgrade warning behavior.
+- Renamed the single reviewer packet to
+  `docs/RLM_ORCHESTRATOR_V0_4_4_REVIEW_PACKET.md` and updated disposition/brief
+  pointers.
+- Updated `task_plan.md` and `findings.md`; Phase 21 remains in progress
+  because the implementation audit gate is still pending.
+- No RLM Orchestrator runtime code was changed in this pass.
+
+## 2026-06-22 - RLM Orchestrator v0.4.3 Review Fixes
+
+- Read the latest v0.4.2 full-roadmap review responses. Overall disposition
+  remains `APPROVE_FULL_ROADMAP_WITH_FIXES`; no product-boundary or roadmap
+  blockers were found.
+- Conservatively accepted the strictest review classification: crash-consistent
+  write ordering and the budget-ledger file boundary must be specified before
+  MVP 2 implementation resumes.
+- Updated `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` to v0.4.3:
+  - added `budget_ledger.jsonl`;
+  - separated JSON atomic rename semantics from JSONL append/recovery
+    semantics;
+  - defined JSONL edge cases and recovery warning promotion;
+  - added crash-consistent worker lifecycle write ordering and resume
+    reconciliation across worker results, budget ledger, and steps;
+  - clarified structured-output redaction order and downstream-worker
+    redaction;
+  - defined budget ledger transition shape and verifier reserve behavior;
+  - tightened two-phase lease finalization critical-section semantics;
+  - added warning, verifier, schema-version, `UNHASHABLE`, retry-cache,
+    `coverage_score`, doctor diagnostics, fast-path plan, and
+    `PARTIAL`/`PARTIAL_BLOCKED` clarifications.
+- Renamed the single reviewer packet for v0.4.3 and updated its contents; it
+  was later superseded by the v0.4.4 packet.
+- Updated `task_plan.md`, `findings.md`, and historical review docs so MVP 2
+  remains blocked pending implementation audit against v0.4.3.
+- No RLM Orchestrator runtime code was changed in this pass.
+
+## 2026-06-22 - RLM Orchestrator v0.4.2 Reviewer Packet
+
+- Read three follow-up v0.4.1 reviews:
+  - `APPROVE_FULL_ROADMAP_WITH_FIXES`;
+  - `APPROVE_FULL_ROADMAP_WITH_FIXES`;
+  - `APPROVE_FULL_ROADMAP_WITH_FIXES`.
+- Updated `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` to v0.4.2 with the
+  review-requested schema and atomicity fixes:
+  - defined `lineage_id`;
+  - changed worker refs from `source_id` to `evidence_id`;
+  - made context drift handling additive;
+  - defined resumable statuses and MVP 1 `coverage_score` behavior;
+  - added atomic run-state writes, JSONL recovery, persisted budget ledger,
+    two-phase lease finalization, and centralized evidence id allocation;
+  - clarified relevance-score absence, supported worker schema versions,
+    verifier budget exhaustion, `UNHASHABLE` reasons, retry hash scope, source
+    location changes, model diagnostics, generated-text redaction, and worker
+    result size handling.
+- Created an initial single reviewer-facing document requested by the user;
+  it was later superseded by the v0.4.3 packet.
+- Updated `docs/RLM_ORCHESTRATOR_V0_4_REVIEW_DISPOSITION.md`, `task_plan.md`,
+  and `findings.md` so v0.4.2 is the current review target and MVP 2 remains
+  blocked pending review acceptance plus implementation audit.
+- No RLM Orchestrator runtime code was changed in this pass.
+
+## 2026-06-22 - Phase 1A Contract/Config/OpenAPI Foundation Slice
+
+- Restored the v0 implementation context from
+  `docs/MNEME_STANDALONE_SPEC.md`, `docs/MNEME_V0_COMPLIANCE_MATRIX.md`,
+  `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`, `task_plan.md`,
+  `findings.md`, and `progress.md`.
+- Used `spec-driven-planning` as the workflow skill and `mneme-memory` only as
+  an evidence lane. Mneme session discovery was ambiguous for the exact project
+  path; the newest matching session
+  `019eef15-23d8-7171-a2d7-0325d4b98b90` and prior large session
+  `019eedf6-450a-77f2-ad7b-d6b1ef744024` corroborated the current prompt and
+  Phase 20A audit context, but all implementation decisions were checked
+  against current files.
+- Phase 1A scope:
+  - Matrix rows addressed: CM-017, CM-034, CM-058, CM-059, and Section 24
+    mapping rows 43/85 and 72/77/108.
+  - Rows intentionally left PARTIAL: project isolation/auth-failure audit,
+    blob lifecycle, metrics endpoint, idempotency ledger, storage migrations,
+    and route-wide typed OpenAPI schemas remain open.
+- Added RED tests:
+  - `tests/test_config.py::test_loads_v0_foundation_config_sections`
+  - `tests/test_config.py::test_invalid_v0_foundation_config_fails_startup`
+  - `tests/test_openapi.py`
+- Implemented:
+  - v0 foundation config defaults and validation in `mneme_service/config.py`
+    for blob limits, multipart limits, idempotency retention, writer queue
+    depth, metrics format, graph limits, redaction timeout, reindex controls,
+    strict cost mode, audit retention, and project isolation key.
+  - typed capabilities/error OpenAPI components in `mneme_service/schemas.py`.
+  - expanded `/v1/capabilities` reporting in `mneme_service/app.py`, including
+    MCP tool versions, schema-version vocabulary, metrics format, tokenizer,
+    storage, limits, and truthful false flags for unsupported v0 features.
+  - OpenAPI bearer security scheme injection.
+- Verification:
+  - RED: `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_config.py::test_loads_v0_foundation_config_sections tests/test_config.py::test_invalid_v0_foundation_config_fails_startup tests/test_openapi.py -q`
+    failed as expected with `7 failed` before implementation.
+  - GREEN targeted: same command passed with `7 passed, 1 warning in 0.42s`.
+  - Focused regression: `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_config.py tests/test_openapi.py tests/test_contract.py::test_auth_health_capabilities_and_session_idempotency tests/test_config.py::test_capabilities_reflect_provider_configuration_without_leaking_secrets tests/test_parity_recovery.py::test_minimal_mode_redacts_and_makes_zero_provider_calls -q`
+    passed with `17 passed, 1 warning in 0.51s`.
+  - REST/MCP focused: `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_contract.py tests/test_mcp_contract.py tests/test_openapi.py -q`
+    passed with `30 passed, 1 warning in 1.41s` after the schema compatibility
+    self-review fix.
+  - Full test suite: `env TMPDIR=/private/tmp .venv/bin/python -m pytest -q`
+    passed with `149 passed, 1 warning in 3.95s`.
+  - Compile check: `env TMPDIR=/private/tmp .venv/bin/python -m compileall -q mneme_service tests`
+    exited 0 with no output.
+- Self-review fix: capabilities advertised `mneme.session_start.v0`, but
+  `/v1/sessions/start` initially accepted only `mneme.session.v0`. Added
+  `tests/test_contract.py::test_session_start_accepts_advertised_session_start_schema`
+  and watched it fail with `400 BAD_REQUEST`; then allowed the start endpoint
+  to accept the advertised schema and echo the accepted schema version. The new
+  test passed with `1 passed, 1 warning in 0.21s`.
+- Operator note: one intermediate regression command used the stale pytest node
+  id `test_minimal_mode_makes_no_provider_calls`; pytest exited 4 with no
+  matching test. The command was corrected to
+  `test_minimal_mode_redacts_and_makes_zero_provider_calls` and rerun
+  successfully.
+- Updated `docs/MNEME_V0_COMPLIANCE_MATRIX.md` with Phase 1A evidence. Overall
+  matrix row counts are now `COMPLIANT` 3, `PARTIAL` 52, `MISSING` 9,
+  `UNCLEAR` 0, `OUT_OF_SCOPE/FUTURE` 1.
+
+## 2026-06-22 - RLM Orchestrator v0.4 Review Disposition Consolidated
+
+- Read three new v0.4 architecture review responses:
+  - `BLOCK_MVP2`;
+  - `APPROVE_FULL_ROADMAP_WITH_FIXES`;
+  - `APPROVE_FULL_ROADMAP_WITH_FIXES`.
+- Consolidated the reviews conservatively: MVP 1 remains safe to finish, but
+  MVP 2 remains blocked until the accepted spec response and implementation
+  audit are complete.
+- Updated `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` to v0.4.1 with
+  normative fixes for context drift response, source snapshot sub-hashes,
+  model/provider fingerprinting, worker-result reuse compatibility, evidence
+  pack fingerprints, deadline-only MVP 2 leases, warning objects, verifier
+  schema, `coverage_score`, confidence penalties, evidence id scope, and
+  continuation lineage/workspace semantics.
+- Added `docs/RLM_ORCHESTRATOR_V0_4_REVIEW_DISPOSITION.md` to record accepted
+  fixes and resolved reviewer disagreements.
+- Updated `docs/RLM_ORCHESTRATOR_V0_4_REVIEW_BRIEF.md`, `task_plan.md`, and
+  `findings.md` to point to the disposition and keep the MVP 2 audit gate
+  visible.
+- No RLM Orchestrator code was changed in this documentation pass.
+
+## 2026-06-22 - RLM Orchestrator v0.4 Full-Roadmap Review Prep
+
+- Re-read RLM Orchestrator planning state, the active RLM spec, and the
+  user-provided reviewer attachments.
+- Determined that multiple reviewers had already flagged the Phase 19 blocker
+  class: resume after cancellation, task hash/evidence content coupling,
+  context drift, stable evidence ids, budget reservation concurrency, and old
+  versus current evidence reconciliation.
+- Updated `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` from v0.3 to v0.4 review
+  candidate.
+- Added normative full-roadmap review intent and MVP 2 semantics for run
+  lineage, source context snapshots, `context_snapshot_hash`, worker task
+  hashes, evidence pack fingerprints, worker-result reuse, budget leases,
+  stable evidence ids, temporal reconciliation, final status/warning taxonomy,
+  and strengthened MVP 2 exit criteria.
+- Created `docs/RLM_ORCHESTRATOR_V0_4_REVIEW_BRIEF.md` to tell reviewers that
+  the goal is a full product contract through MVP 6, not only approval to start
+  MVP 1.
+- Updated `task_plan.md` and `findings.md` so further RLM MVP 2 development is
+  paused until v0.4 review/disposition and an audit of existing MVP 1 + Phase
+  16-19 implementation against the accepted contract are complete.
+- No RLM Orchestrator code was changed in this documentation pass.
+
+## 2026-06-22 - Phase 20A Compliance Audit Started
+
+- Loaded the user-approved audit skills: planning-with-files,
+  spec-driven-development, spec-driven-planning, code-review-and-quality,
+  api-and-interface-design, security-guidance, python-backend-expert, fastapi,
+  systematic-debugging, verification-before-completion,
+  documentation-and-adrs, and mneme-memory.
+- Restored local project context from `task_plan.md`, `findings.md`,
+  `progress.md`, `docs/MNEME_STANDALONE_SPEC.md`, and
+  `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`.
+- Confirmed `docs/MNEME_STANDALONE_SPEC.md` is the Final v0.7.5 source of
+  truth for this audit and that Phase 20 starts with a compliance matrix plus
+  fresh baseline tests.
+- Recorded that the worktree was already dirty before the audit; no existing
+  changes are to be reverted.
+- Ran planning session catchup:
+  `python3 /Users/openclaw/CodexShared/skills/planning-with-files/scripts/session-catchup.py /Users/openclaw/.hermes/plugins/_mneme-universal-context-service`;
+  it produced no output.
+- Mneme memory discovery was ambiguous for the project path; newest matching
+  session `019eedf6-450a-77f2-ad7b-d6b1ef744024` was used only to corroborate
+  the current audit prompt and recent tool context. Traces observed:
+  `trace-9ffaed7b371f45e28ead61ee46c85550`,
+  `trace-86447b4db792407496e8f0bf20340288`.
+- Added Phase 20A audit scope and verification gates to `task_plan.md`.
+- Phase 20A context/inventory planning gate:
+  - `rg -n "Phase 20A|Compliance Audit Baseline|Compliance Audit Started" task_plan.md findings.md progress.md`
+    found the new markers in all three planning files.
+  - `rg -n "^(<<<<<<<|=======|>>>>>>>)" task_plan.md findings.md progress.md`
+    returned no matches.
+  - `rg -n "[[:blank:]]$" task_plan.md findings.md progress.md`
+    returned no matches.
+- Phase 20A implementation inventory evidence:
+  - FastAPI route/OpenAPI introspection found current public routes for health,
+    capabilities, readiness, sessions/start, events, turns/complete,
+    context/prepare, REST memory tools, traces, costs, session export, and
+    session delete.
+  - Missing from current route inventory relative to Final v0.7.5: blob
+    endpoints, `/v1/metrics`, maintenance blob-gc/reindex endpoints, direct
+    segment REST endpoints, session get/close, retention cleanup, and
+    `POST /v1/sessions/{session_id}/execution_state`.
+  - OpenAPI introspection found only FastAPI's default validation schemas, not
+    typed public Mneme v0 request/response component schemas.
+  - SQLite schema introspection found `PRAGMA user_version=0` and no
+    `schema_migrations`, `blobs`, idempotency, retention, or reindex job tables.
+- Phase 20A baseline verification:
+  - `env TMPDIR=/private/tmp .venv/bin/python -m pytest -q`:
+    `141 passed, 1 warning in 3.98s`.
+  - `env TMPDIR=/private/tmp .venv/bin/python -m compileall -q mneme_service tests`:
+    exit code 0.
+  - `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_contract.py tests/test_mcp_contract.py -q`:
+    `27 passed, 1 warning in 2.11s`.
+  - `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_parity_recovery.py -q`:
+    `5 passed, 1 warning in 0.96s`.
+  - `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_config.py tests/test_context_prepare.py tests/test_context_assembly.py tests/test_graph.py tests/test_segments.py tests/test_retrieval.py tests/test_state.py -q`:
+    `32 passed, 1 warning in 2.21s`.
+- Created `docs/MNEME_V0_COMPLIANCE_MATRIX.md` as the Phase 20A read-only
+  audit artifact. It records 65 traceable matrix rows and maps all Section 24
+  required contract test numbers 1-119 to current, partial, missing, or planned
+  coverage.
+- Updated `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md` with a 2026-06-22
+  audit baseline update. The update moves project isolation, safe token
+  handling, auth-failure audit, storage migrations, writer lane, idempotency,
+  blob/BYTES_REF, and OpenAPI schema work into the earliest foundation work.
+- Updated `findings.md` with Phase 20A blocker and high-priority gap summary.
+- Phase 20A matrix/gap-plan verification gate passed:
+  - Matrix parser check returned 65 rows with counts `COMPLIANT` 3,
+    `PARTIAL` 51, `MISSING` 10, `UNCLEAR` 0,
+    `OUT_OF_SCOPE/FUTURE` 1.
+  - Section 24 mapping covers all required test numbers 1-119 with no missing
+    numbers.
+  - Conflict-marker, trailing-whitespace, and TODO/TBD scans over
+    `docs/MNEME_V0_COMPLIANCE_MATRIX.md`,
+    `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`, `task_plan.md`,
+    `findings.md`, and `progress.md` returned no matches.
+- Marked Phase 20A complete in `task_plan.md`; no code changes were made.
+
+## 2026-06-21 - Mneme v0.7.5 Final Approval Recorded
+
+- Received the final reviewer verdict approving v0.7.5 as the target v0
+  specification.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` from approval candidate to
+  Final/Approved for v0 implementation.
+- Updated `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`,
+  `HERMES_MNEME_COMPARISON.md`, `task_plan.md`, and `findings.md` so the
+  project now transitions from architecture review to implementation gap
+  execution.
+- Next implementation action is Phase 0 of the compliance plan: create
+  `docs/MNEME_V0_COMPLIANCE_MATRIX.md` and record a baseline full test run.
+
+## 2026-06-21 - Mneme v0.7.4 Final Micro-Polish
+
+- Processed the final approval-positive v0.7.4 review.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` to approval candidate v0.7.5.
+- Added adapter guidance for `422 REDACTION_TIMEOUT`: retrying the same inline
+  payload is expected to fail; adapters should split payloads or use `BYTES_REF`
+  metadata/blob ingestion.
+- Clarified that readiness calls with `allow_provider_calls=true` share normal
+  provider budgets, rate limits, circuit breakers, retries, and cost accounting.
+- Clarified that adapters and storage layers must preserve array insertion
+  order for state-hash fields unless an explicit stable sort key is part of the
+  v0 hash contract.
+- Updated `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`,
+  `HERMES_MNEME_COMPARISON.md`, `task_plan.md`, and `findings.md` to target
+  v0.7.5.
+
+## 2026-06-21 - Mneme v0.7.3 Algorithmic Hardening Reviewer Response
+
+- Read the new v0.7.3 architecture review attachment.
+- Classified the review as approval-positive but with valid production-risk
+  `MUST FIX` items around canonical state hashing, graph traversal bounds,
+  readiness provider-call boundaries, local deterministic entity contradiction,
+  and bounded writer queues.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` to draft v0.7.4.
+- Added RFC 8785/JCS canonical JSON requirements for `state_hash`, graph
+  traversal hard limits (`max_traversal_steps`, `max_frontier_size`,
+  `max_branching_factor`), provider-free `require_evidence=false` readiness,
+  explicit `allow_provider_calls=false` default for evidence readiness,
+  whitespace-word entity contradiction windows, `max_writer_queue_depth`,
+  `max_multipart_transaction_ms`, redaction timeout behavior, stricter segment
+  creation idempotency, MCP versioning guidance, `UNAUTHENTICATED` audit
+  principal semantics, `EXTERNAL_MCP_CONTENT` trust wording, and
+  `trace.execution_state_compression_level`.
+- Added required contract tests 109-119 for the new hardening behavior.
+- Updated `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`,
+  `HERMES_MNEME_COMPARISON.md`, `task_plan.md`, and `findings.md` to target
+  v0.7.4.
+- Did not rename `best_guess_session_id`; existing stable semantics were kept
+  to avoid migration churn.
+
+## 2026-06-21 - Mneme v0.7.2 Hermes Parity Reviewer Response
+
+- Read the three new reviewer attachments for Mneme v0.7.2 Hermes parity.
+- Classified the review set as approved overall, with two deterministic
+  implementation gaps worth closing before coding: delta extraction schema/rules
+  and retrieval scoring formula/weights.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` to draft v0.7.3.
+- Added explicit `mneme.entity_modifier.v0`, deterministic delta extraction
+  rules/conflict ordering, default switch phrases, entity contradiction terms,
+  routing scoring formula, default routing weights, score-breakdown shape,
+  deterministic indexing excerpt fallback, drift-score formula, trusted
+  tool-domain shift guidance, `MEMORY_READ_EVIDENCE` graph edges, bounded
+  memory-read summary format, and labeled quality metric expectations.
+- Added required contract tests 101-108 for the new deterministic behavior.
+- Updated `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md` to target v0.7.3
+  and include the new Hermes-parity implementation tasks.
+- Updated `HERMES_MNEME_COMPARISON.md`, `task_plan.md`, and `findings.md` so
+  the review packet no longer points to v0.7.2 as the current target.
+
+## 2026-06-21 - Original Hermes Spec Comparison Response
+
+- Read the reviewer comparison against the original `hermes-mneme` design and
+  the original Hermes Context Engine Plugin v1.0/v1.1 specification attached by
+  the user.
+- Determined that the comparison does not invalidate Mneme v0.7.1's security,
+  API, lifecycle, and operations improvements, but it does expose one important
+  spec gap: retrieval intelligence from Hermes must be explicit in Universal
+  Mneme rather than left as adapter folklore.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` to draft v0.7.2.
+- Added Hermes-parity requirements for deterministic intent classification,
+  state-based continuation query construction, routing modes, automatic
+  segmentation triggers, centroid-based embedding drift, selective indexing
+  compression for long tool outputs, embedding-model-id filtering, and
+  memory-tool feedback continuity.
+- Added required contract tests 93-100 for runtime-neutral routing,
+  segmentation, selective compression, model-id filtering, memory feedback,
+  and redacted segment-drift traces.
+- Updated `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md` so implementation
+  phases include Hermes-parity retrieval intelligence as compliance work.
+
+## 2026-06-21 - Standalone Mneme v0.7.1 Approval Response And Compliance Plan
+
+- Read the four v0.7 reviewer attachments plus the user's inline approval
+  summary.
+- Classified the review set as mostly approved but with real implementation
+  blockers that should be closed before code work: undefined public schemas,
+  missing `AUTH_FAILURE` enum value, retention cleanup request/response
+  contract, `force_active_cleanup` race behavior, missing
+  `session_resolution.source` schema, reindex cancel idempotency, graph scoring
+  normative ambiguity, canonical budget split keys, session id limits, and
+  multipart/export edge cases.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` to draft v0.7.1.
+- Added standalone schema definitions for `mneme.context_prepare_request.v0`,
+  `mneme.trace.v0`, `mneme.cost_report.v0`,
+  `mneme.state_history_entry.v0`, `mneme.session_lineage.v0`, and retention
+  cleanup request/result shapes.
+- Tightened v0.7.1 behavior for audit actions, forensic anchor hashing,
+  retention cleanup responses, active-session cleanup conflicts, deterministic
+  session best-guess, MCP-only `DEFAULT_SESSION_STALE`, MCP
+  `session_resolution.source`, idempotency-key retention, reindex cancel final
+  states, unsupported export formats, graph importance boost, budget split
+  keys, no-user-message prepare requests, and redaction ordering.
+- Added required contract tests 85-92 and review finding coverage rows for the
+  new v0.7.1 decisions.
+- Created `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md` with phased,
+  verifiable implementation work from compliance matrix through review packet.
+
+## 2026-06-21 - Standalone Mneme v0.7 Final Review Polishing
+
+- Read the three new v0.6 external reviewer attachments plus the inline
+  positive assessment from the user.
+- Determined that the review set is not yet a clean approval gate: two
+  reviewer files still identify final edge cases that should be fixed before
+  implementation planning.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` to draft v0.7.
+- Closed final context-prepare UX issue: the current latest user request is
+  protected from best-effort truncation; over-budget current requests now fail
+  with `LATEST_USER_MESSAGE_EXCEEDS_BUDGET`.
+- Closed final security/lifecycle issues: privacy delete preserves anonymized
+  forensic audit anchors, automatic retention skips active sessions unless
+  OWNER forces cleanup, and MCP stale default sessions return
+  `DEFAULT_SESSION_STALE`.
+- Closed final storage/operations issues: portable blob export is now
+  streaming `tar_bundle`, multipart ingest has total blob byte and transaction
+  byte limits, background jobs use micro-transactions/yields, reindex jobs can
+  be cancelled, provider backlog drain is throttled, and `WAITING_FOR_PROVIDER`
+  jobs have an expiry.
+- Closed remaining schema/DX details: `metrics_format`, stable
+  `best_guess_session_id` semantics, segment-start idempotency, event
+  importance rules, segment `created_by` enum, blob `omitted_reason` enum, and
+  `context_prepare_response.v0` example.
+- Updated `API_MCP_CONTRACT_V0.md` with matching `tar_bundle`,
+  `metrics_format`, multipart byte limits, and context prepare trace fields.
+- Verification: `git diff --check` passed; conflict-marker scan passed;
+  trailing-whitespace scan passed; targeted coverage grep confirmed v0.7
+  status, protected latest-user behavior, forensic anchors, active-session
+  retention guard, tar export, reindex cancel/throttle, multipart byte limits,
+  MCP stale-session error, and enum/feature-detection additions.
+
+## 2026-06-21 - Standalone Mneme v0.6 Review Response
+
+- Read the four new v0.5 external reviewer responses attached by the user.
+- Classified the feedback into accepted blockers/high-priority contract fixes
+  and future product/adoption questions.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` to draft v0.6.
+- Added or tightened requirements for: `mneme.segment.v0`, segment event
+  summaries, session-start required fields, segment-close outcome enum,
+  reindex job status/polling, retention cleanup authorization, 412 readiness
+  example, capabilities schema-version inventory, and explicit supported
+  export formats.
+- Reworked blob/export requirements: default SQLite blob limit is now 2 MiB,
+  `max_export_blob_inline_bytes=0`, JSON export is metadata-only by default,
+  and portable blob-byte export uses streaming `multipart_bundle`.
+- Clarified context packing: headroom is `minimum_headroom_tokens`, unused
+  evidence budget becomes unused slack, latest user message selection is
+  deterministic, oversized text truncates best-effort by default, and
+  impossible minimum content returns `422` with
+  `MINIMUM_REQUIRED_CONTENT_EXCEEDS_BUDGET`.
+- Added operational requirements for foreground writer priority, background
+  job backoff, provider retry/backoff, automatic retention sweeps, startup
+  integrity checks, `/v1/metrics`, structured logs, and XML/JSON escaping for
+  untrusted evidence wrappers.
+- Updated `API_MCP_CONTRACT_V0.md` and
+  `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` so readiness fallback is
+  alpha-compatibility only, not v0-compliant daemon behavior.
+- Verification: `git diff --check` passed; conflict-marker scan passed;
+  trailing-whitespace scan passed; targeted coverage grep confirmed v0.6
+  status, segment schema, export limits/formats, reindex polling,
+  headroom/slack semantics, foreground writer priority, integrity/metrics,
+  readiness `412`, and RLM/API compatibility wording.
+
+## 2026-06-21 - Standalone Mneme v0.5 Review Polish
+
+- Read the four new v0.4 external reviewer responses attached by the user.
+- Classified the feedback into accepted contract fixes and disputed product
+  boundary suggestions.
+- Updated `docs/MNEME_STANDALONE_SPEC.md` to draft v0.5.
+- Accepted and documented fixes for: uniform REST error examples, missing
+  Section 12 control schemas, segment scoping and close request body, session
+  export format, retention cleanup cutoff, blob GC authorization, multipart
+  event ingest, idempotency coverage, warning-code distinction, migration
+  version mismatch, Range semantics, graph edge taxonomy/scoring, budget
+  cascade into tail/evidence, oversized latest-message behavior, default
+  SQLite blob limit, binary blob redaction caveat, batch-first ingestion, and
+  reindex maintenance.
+- Kept MCP v0 read-oriented; recorded `append_insight`/`save_decision` as a
+  future write-contract decision rather than adding model-callable writes to
+  v0.
+- Kept `/v1/readiness/session` as the hard-dependency run-start gate; tightened
+  the temporary fallback so it is allowed only after capabilities/version
+  metadata proves the endpoint is unavailable.
+- Updated `API_MCP_CONTRACT_V0.md` and
+  `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` with the same readiness fallback
+  capability-check clarification.
+- Added Phase 17C to `task_plan.md` and recorded the decisions in
+  `findings.md`.
+- Verification: `git diff --check` passed; conflict-marker scan passed;
+  trailing-whitespace scan passed; targeted grep confirmed v0.5 status,
+  10 MiB SQLite blob default, schema additions, budget cascade, range/error
+  codes, reindex, MCP write FUTURE status, and readiness capability check.
+
 ## 2026-06-21 - Mneme/RLM REST/MCP Consistency Spec Alignment
 
 - Read `planning-with-files`, `receiving-code-review`, and `mneme-memory`
@@ -144,16 +646,20 @@
 
 ## Current Snapshot
 
-- **Current phase:** Phase 17B Mneme/RLM REST/MCP consistency spec alignment is
-  complete.
-- **Current status:** `docs/MNEME_STANDALONE_SPEC.md` is the single-file draft
-  v0.4 reviewer packet with the REST/MCP auth/readiness addendum reflected.
+- **Current phase:** Phase 17K v0.7.5 final approval record is complete;
+  Phase 20 implementation gap execution is ready to start.
+- **Current status:** `docs/MNEME_STANDALONE_SPEC.md` is the single-file Final
+  v0.7.5 approved target specification.
+  `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`
+  is the approved roadmap for bringing the current alpha implementation into compliance,
+  including deterministic Hermes-parity retrieval intelligence and algorithmic
+  hardening limits plus final adapter-DX polish.
   Phase 14C daemon/core parity remains complete; Hermes
   adapter work remains deferred until upstream native context-engine hooks are
   accepted.
-- **Next action:** send `docs/MNEME_STANDALONE_SPEC.md` to reviewers. After
-  approval, create a compliance implementation plan from section 27 of the
-  standalone spec.
+- **Next action:** start implementation with
+  `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md` Phase 0: create
+  `docs/MNEME_V0_COMPLIANCE_MATRIX.md` and record a baseline full test run.
 - **Active plan:** Phase 13 publication split correction after `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md` completion.
 - **Primary source files:** `task_plan.md`, `findings.md`, `progress.md`, `MILESTONE_6_FULL_HERMES_MNEME_PARITY_COMPLETION_PLAN.md`, `MILESTONE_4_CODEX_MEMORY_DOGFOOD_AND_PROVIDER_CONFIG_PLAN.md`, `adapters/codex/MNEME_CODEX_MCP_USAGE.md`, `API_MCP_CONTRACT_V0.md`, `MNEME_HOST_ADAPTER_CONTRACT_V0.md`.
 - **Hard constraints:** do not touch live Hermes or live `hermes-mneme`; work only in `_mneme-universal-context-service`.

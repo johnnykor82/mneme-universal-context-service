@@ -30,7 +30,6 @@ export MNEME_AUTH_TOKEN="<mneme-auth-token>"
 mkdir -p .local
 .venv/bin/python -m mneme_service.cli serve \
   --db .local/mneme-dogfood.db \
-  --token "$MNEME_AUTH_TOKEN" \
   --port 8767
 ```
 
@@ -43,8 +42,7 @@ cd /Users/openclaw/.hermes/plugins/_mneme-universal-context-service
 export MNEME_AUTH_TOKEN="<mneme-auth-token>"
 .venv/bin/python -m mneme_service.cli codex-ingest \
   --input adapters/codex/transcript.example.json \
-  --base-url http://127.0.0.1:8767 \
-  --token "$MNEME_AUTH_TOKEN"
+  --base-url http://127.0.0.1:8767
 ```
 
 Expected first import result:

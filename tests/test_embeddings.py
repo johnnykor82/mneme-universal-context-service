@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from mneme_service.app import create_app
 from mneme_service.config import ProviderSettings, Settings
-from mneme_service.embeddings import EmbeddingIndex, OpenAICompatibleEmbeddingProvider
+from mneme_service.embeddings import EmbeddingIndex, OpenAICompatibleEmbeddingProvider, summarize_for_embedding
 from mneme_service.storage import Store
 
 
@@ -288,6 +288,26 @@ def test_embedding_index_top_k_zero_means_unlimited_and_global_search_crosses_se
     assert {item["event_id"] for item in global_results} == {"event-auth-a", "event-auth-b"}
 
 
+def test_embedding_search_isolated_to_active_model_id(tmp_path: Path) -> None:
+    store = Store(tmp_path / "mneme.db")
+    provider = StaticEmbeddingProvider()
+    old_index = EmbeddingIndex(store, provider, model_id="embedding-old", batch_size=10)
+    new_index = EmbeddingIndex(store, provider, model_id="embedding-new", batch_size=10)
+    record = {
+        "event_id": "event-old-model-only",
+        "session_id": "session-emb",
+        "segment_id": "segment-session-emb",
+        "text": "oauth refresh token handshake",
+        "token_count": 4,
+        "type": "USER_MESSAGE",
+    }
+
+    old_index.index_events([record])
+
+    assert old_index.search("authentication refresh flow", session_id="session-emb", top_k=5)[0]["event_id"] == "event-old-model-only"
+    assert new_index.search("authentication refresh flow", session_id="session-emb", top_k=5) == []
+
+
 def test_embedding_drift_uses_centroid_window_for_recent_topic_evolution(tmp_path: Path) -> None:
     store = Store(tmp_path / "mneme.db")
     provider = StaticEmbeddingProvider()
@@ -450,6 +470,20 @@ def test_tool_output_embedding_compression_uses_settings_threshold(tmp_path: Pat
     assert response.status_code == 200, response.text
     assert provider.calls[0][0] == long_tool_output
     assert "...[truncated " not in provider.calls[0][0]
+
+
+def test_deterministic_index_excerpt_is_stable_without_summary_provider() -> None:
+    content = "alpha head " + ("middle " * 200) + "omega tail"
+
+    first = summarize_for_embedding(content, threshold_tokens=40, summary_tokens=20)
+    second = summarize_for_embedding(content, threshold_tokens=40, summary_tokens=20)
+
+    assert first == second
+    assert first.startswith(content[:40])
+    assert first.endswith(content[-40:])
+    assert "\n...[truncated " in first
+    assert " chars]...\n" in first
+    assert len(first) < len(content)
 
 
 def test_reindex_on_model_change_indexes_existing_events_for_new_model(tmp_path: Path) -> None:

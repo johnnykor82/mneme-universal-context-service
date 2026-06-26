@@ -9,7 +9,7 @@ It does not modify live Codex configuration, does not hook the current Codex pro
 Run the REST daemon explicitly:
 
 ```bash
-mneme serve --db /path/to/mneme.db --token "$MNEME_AUTH_TOKEN"
+mneme serve --db /path/to/mneme.db
 ```
 
 ## Import a Transcript
@@ -17,7 +17,7 @@ mneme serve --db /path/to/mneme.db --token "$MNEME_AUTH_TOKEN"
 Use a local transcript JSON file:
 
 ```bash
-mneme-codex codex-ingest --input transcript.json --base-url http://127.0.0.1:8765 --token "$MNEME_AUTH_TOKEN"
+mneme-codex codex-ingest --input transcript.json --base-url http://127.0.0.1:8765
 ```
 
 For the Codex Desktop global install, let the adapter read the token from the

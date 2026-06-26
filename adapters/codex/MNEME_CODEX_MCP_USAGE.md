@@ -34,7 +34,7 @@ tools to work there.
 Run the REST daemon as an explicit process:
 
 ```bash
-mneme serve --db /path/to/mneme.db --token "$MNEME_AUTH_TOKEN"
+mneme serve --db /path/to/mneme.db
 ```
 
 ## Configure the MCP Server
@@ -42,7 +42,7 @@ mneme serve --db /path/to/mneme.db --token "$MNEME_AUTH_TOKEN"
 Point the local MCP server at the running daemon:
 
 ```bash
-mneme mcp --base-url http://127.0.0.1:8765 --token "$MNEME_AUTH_TOKEN"
+mneme mcp --base-url http://127.0.0.1:8765
 ```
 
 The MCP process exposes the v0 memory tools and proxies them to REST:

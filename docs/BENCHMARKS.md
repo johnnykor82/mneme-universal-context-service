@@ -22,6 +22,15 @@ The command prints a JSON report:
 {
   "schema_version": "mneme.benchmark_report.v0",
   "mode": "LOCAL_FAKE_PROVIDERS",
+  "methodology": {
+    "benchmark_type": "LOCAL_SMOKE",
+    "providers": "LOCAL_FAKE_PROVIDERS",
+    "corpus": "SYNTHETIC_LABELED",
+    "comparative_baseline": "NOT_RUN",
+    "token_reduction_claim": "NOT_CLAIMED",
+    "cost_reduction_claim": "NOT_CLAIMED",
+    "token_estimate_methodology": "SERVICE_COST_COUNTERS"
+  },
   "event_count": 30,
   "timings_ms": {
     "session_start": 1.0,
@@ -36,6 +45,15 @@ The command prints a JSON report:
   },
   "retrieval": {
     "result_count": 5
+  },
+  "quality_report": {
+    "schema_version": "mneme.benchmark_quality_report.v0",
+    "label_source": "SYNTHETIC_CORPUS",
+    "metrics": {
+      "precision_at_k": 1.0,
+      "recall_at_k": 0.5,
+      "mrr": 1.0
+    }
   },
   "context_prepare": {
     "changed": true,
@@ -55,3 +73,7 @@ The command prints a JSON report:
 Treat the numbers as local smoke evidence, not as a cross-machine performance
 claim. Use the same machine, Python version, database location, and event count
 when comparing changes.
+
+The local smoke output has no comparative baseline. It is useful for checking
+that ingestion, retrieval, context prepare, cost counters, and synthetic quality
+reporting still work, but it is not proof of token or cost reduction.

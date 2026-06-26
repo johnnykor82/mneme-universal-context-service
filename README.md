@@ -53,7 +53,7 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[test]"
 export MNEME_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-mneme serve --db .local/mneme.db --token "$MNEME_AUTH_TOKEN"
+mneme serve --db .local/mneme.db
 ```
 
 Health check:
@@ -76,7 +76,7 @@ curl -sS -X POST http://127.0.0.1:8765/v1/readiness/session \
 Run the MCP server as a separate process pointing at the daemon:
 
 ```bash
-mneme mcp --base-url http://127.0.0.1:8765 --token "$MNEME_AUTH_TOKEN"
+mneme mcp --base-url http://127.0.0.1:8765
 ```
 
 ## Configuration
@@ -85,7 +85,7 @@ Start from [mneme.example.toml](mneme.example.toml):
 
 ```bash
 cp mneme.example.toml mneme.toml
-mneme serve --config mneme.toml --token "$MNEME_AUTH_TOKEN"
+mneme serve --config mneme.toml
 ```
 
 Provider secrets should come from environment variables, not tracked config:
@@ -101,18 +101,11 @@ For installation details, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
 ## Adapter Status
 
 This development checkout currently contains Codex adapter work under
-`adapters/codex` while the public split is being prepared. The public engine
-repository should keep host adapters out of the core package; Codex-specific
-hooks, skills, and setup docs belong in a separate adapter repository/package.
+`adapters/codex` while the public split is being prepared. The public engine/core
+and Codex adapter repos/packages are separate; the core package remains host-runtime-neutral.
 
 Codex can use Mneme through MCP as agent-callable memory tools. This is
 tools-only integration, not automatic prompt replacement.
-
-- [adapters/codex/CODEX_AGENT_INSTALL.md](adapters/codex/CODEX_AGENT_INSTALL.md)
-- [adapters/codex/CODEX_DESKTOP_QUICKSTART.md](adapters/codex/CODEX_DESKTOP_QUICKSTART.md)
-- [adapters/codex/MNEME_CODEX_MCP_USAGE.md](adapters/codex/MNEME_CODEX_MCP_USAGE.md)
-- [adapters/codex/MNEME_CODEX_INGEST_USAGE.md](adapters/codex/MNEME_CODEX_INGEST_USAGE.md)
-- [adapters/codex/MNEME_CODEX_HOOKS_USAGE.md](adapters/codex/MNEME_CODEX_HOOKS_USAGE.md)
 
 ## Tests
 

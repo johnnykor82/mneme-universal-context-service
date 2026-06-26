@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -10,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from mneme_service.app import create_app
 from mneme_service.config import Settings
+from mneme_service.utils import canonical_json
 
 
 TOKEN = "test-token"
@@ -160,6 +163,294 @@ def test_execution_state_defaults_include_segment_and_enrichment_fields(tmp_path
         "intent_label": None,
         "topic_tags": [],
     }
+
+
+def test_event_ingest_applies_deterministic_entity_modifiers_to_execution_state(tmp_path: Path) -> None:
+    api = TestClient(create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN)))
+    start_session(api)
+
+    ingest(
+        api,
+        [
+            state_event(
+                "event-add",
+                "Add TokenBroker.",
+                turn_id="turn-1",
+                timestamp="2026-06-12T14:00:00Z",
+            ),
+            state_event(
+                "event-replace",
+                "Replace TokenBroker with OAuthBridge.",
+                turn_id="turn-2",
+                timestamp="2026-06-12T14:00:01Z",
+            ),
+            state_event(
+                "event-remove",
+                "Remove OAuthBridge.",
+                turn_id="turn-3",
+                timestamp="2026-06-12T14:00:02Z",
+            ),
+        ],
+    )
+
+    state = tool(api, "get_execution_state", {"session_id": "session-state"})["data"]
+
+    assert state["active_entities"] == []
+    modifier_trace = state["enrichment"]["entity_modifiers"]
+    assert [(item["modifier_type"], item["entity"], item["value"]) for item in modifier_trace] == [
+        ("ADD", "TokenBroker", None),
+        ("REPLACE", "TokenBroker", "OAuthBridge"),
+        ("REMOVE", "OAuthBridge", None),
+    ]
+    assert all(item["source"] == "DETERMINISTIC_PATTERN" for item in modifier_trace)
+    assert [item["event_id"] for item in modifier_trace] == ["event-add", "event-replace", "event-remove"]
+
+
+def test_event_ingest_entity_modifier_merge_is_idempotent_for_duplicate_add(tmp_path: Path) -> None:
+    api = TestClient(create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN)))
+    start_session(api)
+
+    ingest(
+        api,
+        [
+            state_event(
+                "event-add-1",
+                "Add TokenBroker.",
+                turn_id="turn-1",
+                timestamp="2026-06-12T14:00:00Z",
+            ),
+            state_event(
+                "event-add-2",
+                "Add TokenBroker.",
+                turn_id="turn-2",
+                timestamp="2026-06-12T14:00:01Z",
+            ),
+        ],
+    )
+
+    state = tool(api, "get_execution_state", {"session_id": "session-state"})["data"]
+
+    assert state["active_entities"] == ["TokenBroker"]
+    modifier_trace = state["enrichment"]["entity_modifiers"]
+    assert [item["event_id"] for item in modifier_trace] == ["event-add-1", "event-add-2"]
+
+
+def test_explicit_execution_state_update_patch_replace_records_history(tmp_path: Path) -> None:
+    api = TestClient(create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN)))
+    start_session(api)
+    patch = api.post(
+        "/v1/sessions/session-state/execution_state",
+        headers=auth_headers(),
+        json={
+            "schema_version": "mneme.execution_state_update.v0",
+            "mode": "PATCH",
+            "state": {
+                "goal": "Ship explicit state",
+                "current_step": "Add update endpoint",
+                "open_loops": ["rerun focused tests"],
+                "active_entities": ["execution_state"],
+            },
+            "provenance": {"event_id": "event-state-1"},
+        },
+    )
+    assert patch.status_code == 200, patch.text
+    body = patch.json()
+    assert body["schema_version"] == "mneme.execution_state_update_result.v0"
+    assert body["updated"] is True
+    assert body["state"]["goal"] == "Ship explicit state"
+    assert body["state"]["current_step"] == "Add update endpoint"
+    assert body["state"]["open_loops"] == ["rerun focused tests"]
+    assert body["state"]["active_entities"] == ["execution_state"]
+    assert body["history_entry"]["schema_version"] == "mneme.state_history_entry.v0"
+    assert body["history_entry"]["mode"] == "PATCH"
+    assert body["history_entry"]["changed_fields"] == [
+        "active_entities",
+        "current_step",
+        "goal",
+        "open_loops",
+    ]
+    assert body["history_entry"]["provenance"] == {"event_id": "event-state-1"}
+    assert body["history_entry"]["state_hash"].startswith("sha256:")
+    assert body["history_entry"]["previous_state_hash"].startswith("sha256:")
+
+    replace = api.post(
+        "/v1/sessions/session-state/execution_state",
+        headers=auth_headers(),
+        json={
+            "schema_version": "mneme.execution_state_update.v0",
+            "mode": "REPLACE",
+            "state": {
+                "goal": "Replace state",
+                "current_step": "Verify complete object",
+                "open_loops": [],
+                "active_entities": [],
+                "decision_stack": [],
+                "turn_count": 4,
+            },
+            "provenance": {"turn_id": "turn-state-2", "adapter_trace_id": "trace-state-2"},
+        },
+    )
+    assert replace.status_code == 200, replace.text
+    replaced = replace.json()
+    assert replaced["state"]["session_id"] == "session-state"
+    assert replaced["state"]["schema_version"] == "mneme.execution_state.v0"
+    assert replaced["state"]["goal"] == "Replace state"
+    assert replaced["state"]["current_step"] == "Verify complete object"
+    assert replaced["state"]["turn_count"] == 4
+    assert replaced["history_entry"]["mode"] == "REPLACE"
+    assert replaced["history_entry"]["previous_state_hash"] == body["history_entry"]["state_hash"]
+
+    history = tool(api, "get_goal_history", {"session_id": "session-state", "limit": 5})
+    rows = history["data"]["history"]
+    assert rows[-2]["state_hash"] == body["history_entry"]["state_hash"]
+    assert rows[-1]["state_hash"] == replaced["history_entry"]["state_hash"]
+    assert rows[-1]["sequence"] == rows[-2]["sequence"] + 1
+
+
+def test_execution_state_update_requires_provenance_and_rejects_unknown_fields(tmp_path: Path) -> None:
+    api = TestClient(create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN)))
+    start_session(api)
+
+    missing_provenance = api.post(
+        "/v1/sessions/session-state/execution_state",
+        headers=auth_headers(),
+        json={
+            "schema_version": "mneme.execution_state_update.v0",
+            "mode": "PATCH",
+            "state": {"goal": "No provenance"},
+        },
+    )
+    assert missing_provenance.status_code == 422
+    assert missing_provenance.json()["error"]["details"]["field"] == "provenance"
+
+    unknown_field = api.post(
+        "/v1/sessions/session-state/execution_state",
+        headers=auth_headers(),
+        json={
+            "schema_version": "mneme.execution_state_update.v0",
+            "mode": "PATCH",
+            "state": {"goal": "Allowed", "unexpected": "nope"},
+            "provenance": {"event_id": "event-state-unknown"},
+        },
+    )
+    assert unknown_field.status_code == 422
+    assert unknown_field.json()["error"]["details"]["field"] == "state.unexpected"
+
+    bad_mode = api.post(
+        "/v1/sessions/session-state/execution_state",
+        headers=auth_headers(),
+        json={
+            "schema_version": "mneme.execution_state_update.v0",
+            "mode": "MERGE",
+            "state": {"goal": "Allowed"},
+            "provenance": {"event_id": "event-state-bad-mode"},
+        },
+    )
+    assert bad_mode.status_code == 422
+    assert bad_mode.json()["error"]["details"]["field"] == "mode"
+
+
+def test_state_history_hash_uses_canonical_json_bytes(tmp_path: Path) -> None:
+    api = TestClient(create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN)))
+    start_session(api)
+    state_variant = json.loads(
+        """
+        {
+          "current_step": "Verify canonical hash bytes",
+          "active_entities": ["execution_state", "hash"],
+          "goal": "Ship explicit state"
+        }
+        """
+    )
+    payload = {
+        "schema_version": "mneme.execution_state_update.v0",
+        "mode": "PATCH",
+        "state": state_variant,
+        "provenance": {"event_id": "event-canonical-hash"},
+    }
+
+    response = api.post(
+        "/v1/sessions/session-state/execution_state",
+        headers=auth_headers(),
+        json=payload,
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    logically_equivalent_state = {
+        "schema_version": "mneme.execution_state.v0",
+        "session_id": "session-state",
+        "goal": "Ship explicit state",
+        "current_step": "Verify canonical hash bytes",
+        "active_entities": ["execution_state", "hash"],
+        "open_loops": [],
+        "decision_stack": [],
+        "last_tool": None,
+        "last_tool_output_summary": None,
+        "turn_count": 0,
+        "segment_id": "segment-session-state",
+        "enrichment": {
+            "decision_summary": None,
+            "intent_label": None,
+            "topic_tags": [],
+        },
+    }
+    expected_hash = f"sha256:{hashlib.sha256(canonical_json(logically_equivalent_state).encode('utf-8')).hexdigest()}"
+    assert body["history_entry"]["state_hash"] == expected_hash
+    assert body["history_entry"]["state_hash"] == f"sha256:{hashlib.sha256(canonical_json(body['state']).encode('utf-8')).hexdigest()}"
+    assert body["history_entry"]["previous_state_hash"].startswith("sha256:")
+
+
+def test_execution_state_update_replays_with_idempotency_key(tmp_path: Path) -> None:
+    api = TestClient(create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN)))
+    start_session(api)
+    payload = {
+        "schema_version": "mneme.execution_state_update.v0",
+        "mode": "PATCH",
+        "state": {"goal": "Replay explicit state"},
+        "provenance": {"event_id": "event-state-replay"},
+    }
+    headers = {**auth_headers(), "Idempotency-Key": "state-update-replay"}
+
+    first = api.post("/v1/sessions/session-state/execution_state", headers=headers, json=payload)
+    replay = api.post("/v1/sessions/session-state/execution_state", headers=headers, json=payload)
+
+    assert first.status_code == 200, first.text
+    assert replay.status_code == 200, replay.text
+    assert first.json() == replay.json()
+
+    history = tool(api, "get_goal_history", {"session_id": "session-state", "limit": 10})
+    updates = [
+        row
+        for row in history["data"]["history"]
+        if row["provenance"] == {"event_id": "event-state-replay"}
+    ]
+    assert len(updates) == 1
+
+
+def test_execution_state_update_idempotency_key_rejects_conflict(tmp_path: Path) -> None:
+    api = TestClient(create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN)))
+    start_session(api)
+    headers = {**auth_headers(), "Idempotency-Key": "state-update-conflict"}
+    first_payload = {
+        "schema_version": "mneme.execution_state_update.v0",
+        "mode": "PATCH",
+        "state": {"goal": "First state"},
+        "provenance": {"event_id": "event-state-first"},
+    }
+    second_payload = {
+        "schema_version": "mneme.execution_state_update.v0",
+        "mode": "PATCH",
+        "state": {"goal": "Second state"},
+        "provenance": {"event_id": "event-state-second"},
+    }
+
+    first = api.post("/v1/sessions/session-state/execution_state", headers=headers, json=first_payload)
+    conflict = api.post("/v1/sessions/session-state/execution_state", headers=headers, json=second_payload)
+
+    assert first.status_code == 200, first.text
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "CONFLICT"
 
 
 def test_decision_events_preserve_rationale_when_present(tmp_path: Path) -> None:

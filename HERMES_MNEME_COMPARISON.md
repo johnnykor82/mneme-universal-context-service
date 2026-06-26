@@ -3,6 +3,19 @@
 Date: 2026-06-15
 Status: post-Phase-14C parity completion
 
+Update 2026-06-21: the standalone Mneme specification Final v0.7.5 now
+normatively captures the Hermes retrieval-intelligence lessons that this
+comparison originally tracked: deterministic intent classification, automatic
+segmentation, selective indexing compression, routing modes/scoring,
+embedding-model filtering, deterministic delta extraction rules, and
+memory-tool feedback continuity. It also adds algorithmic hardening that was
+not explicit in Hermes: canonical state hashes, bounded graph traversal,
+bounded writer queues, provider-free fast readiness, redaction time bounds, and
+multipart rollback requirements. The final polish clarifies redaction-timeout
+adapter recovery, readiness provider rate limits, and state array ordering for
+canonical hashes. The historical table below is kept as audit context, not as
+the current compliance target.
+
 ## Executive Summary
 
 This document started as a pre-Phase-14 parity audit. At that point the

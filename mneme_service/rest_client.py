@@ -14,6 +14,8 @@ HTTP_ERROR_CODES = {
     409: "CONFLICT",
     412: "FAILED_PRECONDITION",
     413: "PAYLOAD_TOO_LARGE",
+    415: "UNSUPPORTED_MEDIA_TYPE",
+    416: "RANGE_NOT_SATISFIABLE",
     422: "VALIDATION_ERROR",
     429: "RATE_LIMITED",
     500: "INTERNAL_ERROR",
@@ -46,6 +48,16 @@ class MnemeRestClient:
     async def cost_report(self, session_id: str) -> dict[str, Any]:
         session = quote(session_id, safe="")
         return await self._request("GET", f"/v1/costs/session/{session}")
+
+    async def cost_report_tool(self, session_id: str, *, range: str = "SESSION", granularity: str = "SUMMARY") -> dict[str, Any]:
+        return await self.post_tool(
+            "mneme_cost_report",
+            {"session_id": session_id, "range": range, "granularity": granularity},
+        )
+
+    async def get_session(self, session_id: str) -> dict[str, Any]:
+        session = quote(session_id, safe="")
+        return await self._request("GET", f"/v1/sessions/{session}")
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         try:

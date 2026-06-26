@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .classifier import extract_entity_modifiers
 from .utils import text_from_content
 
 
@@ -51,6 +52,7 @@ def apply_event_to_state(state: dict[str, Any], event: dict[str, Any]) -> dict[s
         if not updated.get("goal"):
             updated["goal"] = text[:500]
         updated["current_step"] = text[:300]
+        apply_entity_modifiers(updated, event, text)
     elif event_type == "TOOL_CALL":
         tool_name = event.get("tool", {}).get("name")
         if tool_name:
@@ -78,6 +80,49 @@ def apply_event_to_state(state: dict[str, Any], event: dict[str, Any]) -> dict[s
         )
         updated["decision_stack"] = decisions[-20:]
     return updated
+
+
+def apply_entity_modifiers(state: dict[str, Any], event: dict[str, Any], text: str) -> None:
+    active_entities = [str(entity) for entity in state.get("active_entities") or [] if entity]
+    modifiers = extract_entity_modifiers(text, active_entities=active_entities)
+    if not modifiers:
+        return
+
+    for modifier in modifiers:
+        modifier_type = modifier["modifier_type"]
+        entity = str(modifier["entity"])
+        value = str(modifier["value"]) if modifier.get("value") else None
+        if modifier_type == "ADD":
+            if entity not in active_entities:
+                active_entities.append(entity)
+        elif modifier_type == "REMOVE":
+            active_entities = [item for item in active_entities if item != entity]
+        elif modifier_type == "REPLACE" and value:
+            active_entities = [value if item == entity else item for item in active_entities]
+            deduped: list[str] = []
+            for item in active_entities:
+                if item not in deduped:
+                    deduped.append(item)
+            active_entities = deduped
+
+    enrichment = dict(state.get("enrichment") or {})
+    trace = list(enrichment.get("entity_modifiers") or [])
+    for modifier in modifiers:
+        trace.append(
+            {
+                "schema_version": modifier["schema_version"],
+                "event_id": event["event_id"],
+                "timestamp": event["timestamp"],
+                "modifier_type": modifier["modifier_type"],
+                "entity": modifier["entity"],
+                "value": modifier.get("value"),
+                "source": modifier["source"],
+                "source_span": modifier["source_span"],
+            }
+        )
+    enrichment["entity_modifiers"] = trace[-20:]
+    state["active_entities"] = active_entities
+    state["enrichment"] = enrichment
 
 
 def history_entry_from_state(state: dict[str, Any], timestamp: str) -> dict[str, Any]:

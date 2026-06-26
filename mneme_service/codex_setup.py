@@ -517,9 +517,9 @@ def _serve_script(*, root: Path, db_path: Path, config_path: Path, python: str) 
         'if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi\n'
         ': "${MNEME_AUTH_TOKEN:?MNEME_AUTH_TOKEN is not set}"\n'
         'if [ -f "$CONFIG_FILE" ]; then\n'
-        f'  exec "{python}" -m mneme_service.cli serve --config "$CONFIG_FILE" --db "{db_path}" --token "$MNEME_AUTH_TOKEN" "$@"\n'
+        f'  exec "{python}" -m mneme_service.cli serve --config "$CONFIG_FILE" --db "{db_path}" "$@"\n'
         "else\n"
-        f'  exec "{python}" -m mneme_service.cli serve --db "{db_path}" --token "$MNEME_AUTH_TOKEN" "$@"\n'
+        f'  exec "{python}" -m mneme_service.cli serve --db "{db_path}" "$@"\n'
         "fi\n"
     )
 
@@ -531,7 +531,7 @@ def _mcp_script(*, root: Path, base_url: str, python: str) -> str:
         f'ENV_FILE="{root / ".local" / "mneme.env"}"\n'
         'if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi\n'
         ': "${MNEME_AUTH_TOKEN:?MNEME_AUTH_TOKEN is not set}"\n'
-        f'exec "{python}" -m mneme_service.cli mcp --base-url "{base_url}" --token "$MNEME_AUTH_TOKEN" "$@"\n'
+        f'exec "{python}" -m mneme_service.cli mcp --base-url "{base_url}" "$@"\n'
     )
 
 

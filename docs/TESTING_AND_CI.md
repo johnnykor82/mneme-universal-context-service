@@ -20,6 +20,25 @@ Compile Python modules:
 .venv/bin/python -m compileall -q mneme_service tests
 ```
 
+Run the local benchmark smoke:
+
+```bash
+mneme benchmark --events 30 --db .local/mneme-benchmark.db
+```
+
+The benchmark uses local fake providers and makes no external provider calls.
+Its output includes methodology and synthetic labeled quality metrics. Without
+a comparative baseline, benchmark output is not proof of token or cost
+reduction.
+
+Run an operations runbook smoke whenever changing daemon lifecycle behavior:
+
+- config changes require restart of `mneme serve`;
+- in-flight requests may be interrupted during stop/restart;
+- retry `retryable=true` failures and use `Idempotency-Key` on mutating calls;
+- check structured logs for request id, trace id, endpoint, status, and scope
+  metadata without bearer tokens or memory evidence content.
+
 Scan changed files for merge markers and trailing whitespace:
 
 ```bash

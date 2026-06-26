@@ -17,6 +17,7 @@ from .utils import canonical_json, sha256_text, token_estimate
 class CodexHookPayloads:
     session: dict[str, Any]
     event_batch: dict[str, Any]
+    turn_complete: dict[str, Any] | None = None
 
 
 CODEX_HOOK_MATCHERS = {
@@ -115,7 +116,27 @@ def normalize_codex_hook_payload(
     return CodexHookPayloads(
         session=session,
         event_batch={"schema_version": "mneme.event_batch.v0", "session_id": session_id, "events": [event]},
+        turn_complete=_turn_complete_payload(event, hook_event=hook_event),
     )
+
+
+def _turn_complete_payload(event: dict[str, Any], *, hook_event: str) -> dict[str, Any] | None:
+    turn_id = event.get("turn_id")
+    if hook_event != "Stop" or not isinstance(turn_id, str) or not turn_id:
+        return None
+    return {
+        "schema_version": "mneme.turn.v0",
+        "session_id": event["session_id"],
+        "turn_id": turn_id,
+        "status": "COMPLETED",
+        "started_at": event["timestamp"],
+        "completed_at": event["timestamp"],
+        "event_ids": [event["event_id"]],
+        "metadata": {
+            "source": "codex_hook",
+            "codex_hook_event": hook_event,
+        },
+    }
 
 
 async def import_codex_hook_payload(
@@ -142,7 +163,8 @@ async def import_codex_hook_payload(
     ) as client:
         session = await _post_json(client, "/v1/sessions/start", payloads.session)
         events = await _post_json(client, "/v1/events", payloads.event_batch)
-    return {"session": session, "events": events}
+        turn = await _post_json(client, "/v1/turns/complete", payloads.turn_complete) if payloads.turn_complete else None
+    return {"session": session, "events": events, "turn": turn}
 
 
 async def import_codex_hook_capture_file(
@@ -169,12 +191,14 @@ async def import_codex_hook_capture_file(
             )
             session = await _post_json(client, "/v1/sessions/start", payloads.session)
             events = await _post_json(client, "/v1/events", payloads.event_batch)
+            turn = await _post_json(client, "/v1/turns/complete", payloads.turn_complete) if payloads.turn_complete else None
             results.append(
                 {
                     "event_name": item_event_name or _hook_event_name(payload),
                     "session_created": bool(session.get("created")),
                     "accepted": int(events.get("accepted", 0)),
                     "duplicates": int(events.get("duplicates", 0)),
+                    "turn_completed": turn is not None,
                 }
             )
     return {
@@ -239,8 +263,8 @@ def build_codex_context_prepare_request(
             "retrieval": {"query": query or prompt, "top_k": 8},
             "budget_split": {
                 "execution_state_ratio": 0.10,
-                "retrieved_context_ratio": 0.55,
-                "recent_tail_ratio": 0.25,
+                "retrieved_evidence_ratio": 0.55,
+                "protected_tail_ratio": 0.25,
                 "headroom_ratio": 0.10,
             },
         },
@@ -704,7 +728,6 @@ def _render_hook_command(
         parts.extend(
             [
                 f"--base-url {shlex.quote(base_url)}",
-                f'--token "${token_env}"',
                 f"--timeout {timeout:g}",
             ]
         )
@@ -728,7 +751,6 @@ def _render_context_preview_command(
         "--event UserPromptSubmit",
         f"--output {shlex.quote(output)}",
         f"--base-url {shlex.quote(base_url)}",
-        f'--token "${token_env}"',
         f"--timeout {timeout:g}",
         f"--context-window-tokens {context_window_tokens}",
         f"--budget-tokens {budget_tokens}",

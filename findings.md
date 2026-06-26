@@ -33,6 +33,72 @@
 
 ## Research Findings
 
+### Phase 20A Compliance Audit Baseline Findings
+
+- Current source of truth: `docs/MNEME_STANDALONE_SPEC.md` is Final v0.7.5,
+  approved on 2026-06-21, and supersedes older review-index documents.
+- Current implementation roadmap: `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`
+  starts with Phase 0: create `docs/MNEME_V0_COMPLIANCE_MATRIX.md`, run a
+  baseline full test suite, and inventory public REST/MCP surfaces.
+- Working tree is already dirty before this audit. Pre-existing modified files
+  include `API_MCP_CONTRACT_V0.md`, `HERMES_MNEME_COMPARISON.md`,
+  `docs/MNEME_STANDALONE_SPEC.md`,
+  `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md`, `findings.md`, `progress.md`,
+  and `task_plan.md`; `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md` is
+  untracked. Do not revert these changes.
+- Planning/context restore evidence: required files exist with line counts
+  `task_plan.md` 717, `findings.md` 1006, `progress.md` 2768,
+  `docs/MNEME_STANDALONE_SPEC.md` 4550, and
+  `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md` 480.
+- Mneme memory discovery for this project was ambiguous; newest visible session
+  `019eedf6-450a-77f2-ad7b-d6b1ef744024` corroborates the current audit prompt
+  and recent context restore actions. Mneme memory is evidence only; current
+  files and the Final v0.7.5 spec remain authoritative.
+- Security-guidance reference check found only the local
+  `security-guidance/references` directory and no ASVS `data/asvs/*.md` files
+  in the installed skill bundle, so the security audit must use the concrete
+  Mneme spec requirements plus directly inspected code/tests rather than
+  quoting absent ASVS reference files.
+- Current route/OpenAPI inventory: implemented REST paths include health,
+  capabilities, readiness, sessions/start, events, turns/complete,
+  context/prepare, REST memory tools, traces, costs, session export, and
+  session delete. Missing required v0 paths include blob endpoints,
+  `/v1/metrics`, maintenance blob-gc/reindex endpoints, direct segment REST
+  endpoints, session get/close, retention cleanup, and explicit execution-state
+  update.
+- Current generated OpenAPI has only two component schemas:
+  `HTTPValidationError` and `ValidationError`; public Mneme v0 schemas from
+  spec Section 12 are not modeled as OpenAPI components.
+- Current SQLite initialization creates tables for sessions, events, turns,
+  traces, audit records, segments, embeddings, execution state/history,
+  metrics counters, lineage, and context-fill flags. It does not create
+  `schema_migrations`, blob/blob metadata, idempotency, retention, or reindex
+  job tables, and `PRAGMA user_version` remains `0`.
+- Fresh baseline tests pass in the current alpha implementation:
+  full pytest `141 passed`, compileall exit 0, REST/MCP focused tests
+  `27 passed`, parity recovery `5 passed`, and core config/context/retrieval/
+  state suites `32 passed`. These passing tests are current implementation
+  evidence, not proof of full v0.7.5 compliance.
+- Created `docs/MNEME_V0_COMPLIANCE_MATRIX.md` as the Phase 20A read-only
+  audit artifact. Matrix row counts: `COMPLIANT` 3, `PARTIAL` 51,
+  `MISSING` 10, `UNCLEAR` 0, `OUT_OF_SCOPE/FUTURE` 1.
+- Phase 20A blocker findings:
+  - Project isolation and principal/scope enforcement are not implemented even
+    though `project_isolation_key` is stored.
+  - Some docs/scripts still pass bearer tokens through command-line arguments.
+  - Owned blob/BYTES_REF endpoints, storage, content-range reads, delete, GC,
+    export, and multipart rollback semantics are missing.
+  - Final `Idempotency-Key` request ledger semantics are missing.
+  - SQLite migration/integrity/writer-lane behavior is missing.
+  - Public OpenAPI schemas are not defined beyond FastAPI validation defaults.
+- High-priority findings: direct session get/close/retention cleanup, explicit
+  execution-state update, direct segment REST endpoints, maintenance/reindex,
+  `/v1/metrics`, canonical context-prepare budget keys, latest-user hard
+  protection, trusted evidence wrappers, freshness, final routing/scoring,
+  graph traversal limits, redaction profile/timeouts, audit schema, MCP default
+  session/session-resolution UX, and Section 24 test coverage remain partial or
+  missing.
+
 ### Standalone Spec Review Consolidation Findings
 
 - External reviewers repeatedly identified the same pre-implementation/spec
@@ -123,6 +189,238 @@
   cancellation semantics before MVP 2 parallel workers, and removal of the
   vague fast-path phrase "narrow lookup".
 
+### RLM Orchestrator v0.4 Full-Roadmap Review Findings
+
+- Phase 19 of RLM Orchestrator implementation exposed a real specification
+  blocker: completed worker-result reuse during continuation was
+  underspecified.
+- The blocker was not caused by absence of review. The user-provided reviewer
+  attachments had already identified the relevant gaps: resume after
+  cancellation, task hashes that omit evidence content/version, context drift
+  between runs, stable evidence ids during resume, budget-reservation
+  concurrency, and old/new evidence reconciliation.
+- Root cause: the v0.3 RLM Orchestrator spec was effectively approved for MVP 1
+  planning, but its MVP 2+ reviewer findings were not converted into
+  normative spec language and implementation gates before worker development
+  started.
+- `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` is now updated to v0.4 review
+  candidate. It asks reviewers to evaluate the full roadmap and adds normative
+  rules for run lineage, source context snapshots, `context_snapshot_hash`,
+  worker task hashes, evidence pack fingerprints, worker-result reuse, budget
+  leases, stable evidence ids, temporal reconciliation, and MVP 2 exit
+  criteria.
+- Added `docs/RLM_ORCHESTRATOR_V0_4_REVIEW_BRIEF.md` so reviewers understand
+  the expected output: a full-product disposition, not another
+  "good enough for MVP 1" approval.
+- Further RLM Orchestrator MVP 2 implementation should remain paused until
+  v0.4 receives architecture review/disposition and the already implemented MVP
+  1 + Phase 16-19 behavior is audited against the accepted contract.
+
+### RLM Orchestrator v0.4 Review Disposition Findings
+
+- Three v0.4 review responses were processed: one `BLOCK_MVP2` and two
+  `APPROVE_FULL_ROADMAP_WITH_FIXES`.
+- Conservative disposition: MVP 1 remains safe to finish, but MVP 2 remains
+  blocked until the v0.4.1 spec response is accepted and implementation audit
+  is recorded.
+- Accepted blocking fixes:
+  - context drift response decision tree;
+  - exact worker-result compatibility table;
+  - local proxy model fingerprint/version semantics;
+  - named `context_snapshot_hash` sub-hashes and accepted-evidence filesystem
+    snapshot scope;
+  - stronger evidence pack fingerprint rules;
+  - parseable warning schema;
+  - verifier result schema and trigger conditions;
+  - `coverage_score` and MVP 2 confidence penalty formula;
+  - multi-level continuation lineage/workspace semantics.
+- Resolved reviewer disagreements:
+  - Global content-addressed evidence ids are rejected as an MVP 2 requirement
+    because they create privacy and cross-project correlation risk. Evidence
+    ids remain stable within a run lineage; cross-run consumers must include
+    run or lineage scope.
+  - MVP 2 single-controller budget leases are deadline-only. Heartbeats are
+    deferred until a process-isolated or distributed worker mode is designed.
+  - The source snapshot now uses both named sub-hashes and a root hash, giving
+    simple equality checks plus drift diagnostics.
+- Added `docs/RLM_ORCHESTRATOR_V0_4_REVIEW_DISPOSITION.md` as the audit trail
+  for these choices.
+
+### RLM Orchestrator v0.4.2 Reviewer Packet Findings
+
+- Three follow-up v0.4.1 review responses were processed. All returned
+  `APPROVE_FULL_ROADMAP_WITH_FIXES`.
+- v0.4.1 closed the original four blocking issues, but the follow-up reviews
+  found fast schema/atomicity gaps that should not be handed back to reviewers
+  unresolved.
+- `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` is now v0.4.2 and includes:
+  - `lineage_id = original_run_id`;
+  - worker `evidence_refs` keyed by `evidence_id`, with `source_name` only as
+    display metadata;
+  - additive context drift handling for simultaneous filesystem/git and Mneme
+    drift;
+  - resumable statuses: `CANCELLED`, `PARTIAL_BLOCKED`, and `PARTIAL`;
+  - atomic run-state writes and JSONL malformed-trailing-line recovery;
+  - two-phase lease finalization for timeout/completion races;
+  - centralized evidence id allocation and collision fail-closed behavior;
+  - persisted budget ledger transitions;
+  - deterministic redaction for model-generated worker/verifier/final-report
+    strings;
+  - controlled `UNHASHABLE:<reason>` enum;
+  - `supported_worker_schema_versions`;
+  - `VERIFIER_SKIPPED_BUDGET_EXHAUSTED` warning semantics;
+  - MVP 1 `coverage_score = null`/omitted behavior;
+  - relevance-score absence fallback for confidence weighting;
+  - source-location addition/removal compatibility handling;
+  - `doctor` model-version diagnostics and operator assertion fields.
+- Created an initial single reviewer-facing handoff document, later superseded
+  by the v0.4.3 packet. It includes product boundary, review
+  history, v0.4.2 delta summary, focused review questions, expected disposition
+  format, and the implementation audit gate.
+- This v0.4.2 gate was later superseded by the v0.4.3 review fixes; MVP 2
+  remains paused until the implementation audit against the accepted v0.4.3
+  contract is recorded.
+
+### RLM Orchestrator v0.4.3 Review Findings
+
+- v0.4.2 follow-up reviews again returned
+  `APPROVE_FULL_ROADMAP_WITH_FIXES`.
+- One reviewer classified crash-consistent write ordering and explicit
+  budget-ledger file boundary as blocking until specified. Other reviewers
+  classified the same area as SHOULD_FIX. The spec now treats the issue
+  conservatively and closes it in v0.4.3 before audit.
+- `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` is now v0.4.3 and adds:
+  - `budget_ledger.jsonl` to the run workspace;
+  - separate JSON temp-file/rename semantics and JSONL append/recovery
+    semantics;
+  - JSONL edge-case definitions for empty files, only-malformed trailing
+    files, malformed trailing lines, and malformed non-trailing lines;
+  - crash-consistent worker lifecycle write ordering;
+  - resume reconciliation across `worker_results.jsonl`,
+    `budget_ledger.jsonl`, and `steps.jsonl`;
+  - `RUN_STATE_RECOVERED_FROM_PARTIAL_WRITE` emission to `errors.jsonl` and
+    final report warnings;
+  - post-parse redaction order for structured model outputs and redaction
+    before downstream worker prompts;
+  - SHA-256 canonical JSON definition for `redaction_policy_version`;
+  - budget ledger transition format and verifier reserve enforcement;
+  - two-phase lease finalization critical-section rule;
+  - `ADAPTER_SPECIFIC` unhashable reason path;
+  - retry cache rule that uses `task_hash` only;
+  - worker schema version format and parser-owned
+    `supported_worker_schema_versions`;
+  - evidence id string invariants and worker evidence-ref validation;
+  - verifier budget-exhaustion path split and mid-execution abort/timed-out
+    statuses;
+  - `affected_evidence_ids` in warnings;
+  - `coverage_score` provenance and null fallback;
+  - `doctor` diagnostics schema;
+  - minimal fast-path `plan.json`;
+  - explicit `PARTIAL` vs `PARTIAL_BLOCKED` decision rule.
+- Renamed the single reviewer-facing packet for v0.4.3; it was later
+  superseded by the v0.4.4 packet.
+- Current next step remains implementation audit before any MVP 2 worker or
+  recursion feature work resumes.
+
+### RLM Orchestrator v0.4.4 Review Findings
+
+- The v0.4.3 review responses returned
+  `APPROVE_FULL_ROADMAP_WITH_FIXES`; no blocking ambiguities remained.
+- The remaining findings were bounded `SHOULD_FIX` items suitable for a
+  v0.4.4 patch before implementation audit.
+- `docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC.md` is now v0.4.4 and adds:
+  - required `budget_ledger.jsonl` field names and a minimal transition record
+    example, including `run_id`, reserved/consumed/refunded source-call and
+    token fields, and `SCHEMA_INVALID` status support;
+  - verifier reserve persistence as a ledger entry with
+    `lease_id = "verifier_reserve"` and `worker_id = null`;
+  - synthetic `ABANDONED` step/progress records when resume reconciliation
+    abandons an outstanding reservation after a partial write;
+  - resume-time worker `evidence_refs[].evidence_id` revalidation against the
+    accepted evidence store before scheduling new workers;
+  - ledger-authoritative handling when a valid worker result conflicts with a
+    finalized `TIMED_OUT` or `ABANDONED` budget transition;
+  - explicit no-auto-resume semantics for `PARTIAL`;
+  - required stdout JSON `doctor` diagnostics with
+    `diagnostics_schema_version`, required model fields, and current
+    `supported_worker_schema_versions`;
+  - `model_routing_stability` enum validation;
+  - `ADAPTER_SPECIFIC` `adapter_reason_code` requirements and global
+    per-run `redaction_policy_version` canonicalization;
+  - single-threaded cooperative lease-finalization semantics, threaded lock
+    fallback, and late model-response discard after finalization;
+  - verifier status enum, no-trigger verifier skip behavior, and
+    `verification_invoked: false` metrics;
+  - `PRIOR_RESULT_SCHEMA_UNSUPPORTED` warning for upgrade-related worker schema
+    incompatibility;
+  - warning-field semantics for `evidence_ids` and `affected_evidence_ids`.
+- Renamed the single reviewer-facing packet to
+  `docs/RLM_ORCHESTRATOR_V0_4_4_REVIEW_PACKET.md`.
+- MVP 2 remains paused until the implementation audit is recorded against the
+  accepted v0.4.4 contract. Do not start worker recursion or MVP 2 feature work
+  before that audit.
+
+### RLM Orchestrator v0.4.4 Implementation Audit Findings
+
+- Audit scope:
+  `/Users/openclaw/.hermes/plugins/_rlm-orchestrator/src/rlm_orchestrator`
+  and tests, focusing on Phase 16-19 worker/budget/verifier/resume code.
+- Disposition: `BLOCK_MVP2_IMPLEMENTATION_REMEDIATION`.
+  The implementation audit gate is complete enough to identify blockers, but
+  existing Phase 16-19 code must be remediated before MVP 2 work continues.
+- `RunWorkspace` still writes JSON state files in place through
+  `Path.write_text()` and appends JSONL without explicit recovery semantics.
+  It does not use temp-file/flush/rename for JSON state files, and loaders do
+  not implement malformed trailing-line recovery. This violates the v0.4.3+
+  crash-safe run-state contract.
+- `budget_ledger.jsonl` is not an allowed run file and is not written as an
+  append-only transition log. The current `BudgetLedger` exists only as an
+  in-memory object serialized into `metrics.json` snapshots with
+  `reservation_id`, nested `reserved`/`used`, and `COMPLETED` status. It lacks
+  the v0.4.4 `lease_id`, `transition`, reserved/consumed/refunded field names,
+  `run_id`, `SCHEMA_INVALID`, verifier-reserve entry, and append-only
+  transition semantics.
+- Worker result schema and tests still require `evidence_refs[].source_id`.
+  The accepted contract requires `evidence_refs[].evidence_id`, and resume must
+  revalidate those ids against the accepted evidence store before scheduling.
+  The current worker parser validates shape only and does not check evidence id
+  existence.
+- Resume currently validates `run_state.json`, counts JSONL lines, and starts a
+  new continuation run. It does not recover JSONL prefixes, reconcile
+  `worker_results.jsonl`, `budget_ledger.jsonl`, and `steps.jsonl`, synthesize
+  `ABANDONED` step/progress records, or mark evidence-ref-invalid prior worker
+  results `SCHEMA_INVALID`.
+- `steps.jsonl` is allowed but worker lifecycle code writes progress and
+  worker results only; it does not append step records for reservation,
+  completion, schema-invalid, timeout, cancellation, or abandoned transitions.
+- `doctor` reports a simple `status/checks/warnings` object. It does not emit
+  the v0.4.4 diagnostics contract with `diagnostics_schema_version`, required
+  model diagnostics, `model_routing_stability`, or
+  `supported_worker_schema_versions`. `ModelConfig` also lacks
+  `model_version`, `model_routing_stability`, and
+  `model_routing_stability_asserted_by` fields.
+- Verifier code uses statuses `PASSED`, `NEEDS_WORK`,
+  `CONTRADICTION_FOUND`, and `FAILED`, not the v0.4.4 verifier status enum.
+  The controller runs the verifier whenever worker results exist, but it does
+  not evaluate trigger conditions, record no-trigger
+  `verification_invoked: false`, or represent verifier reserve as
+  `lease_id = "verifier_reserve"` in a persisted ledger.
+- Parallel worker execution uses an `RLock`-protected in-memory ledger, which
+  addresses part of the concurrency race, but there are no persisted leases,
+  deadlines, two-phase lease finalization, `TIMED_OUT` transitions, or
+  late-response discard rules.
+- Worker task hashes include normalized question, source type, parent, depth,
+  and evidence ids only. They do not include evidence pack fingerprint, planner
+  contract version, worker task hashing version, or redaction policy version.
+  Evidence pack fingerprint construction is not implemented.
+- Final report warnings are plain strings, not structured warning objects with
+  `code`, `message`, `severity`, `affected_worker_ids`,
+  `affected_evidence_ids`, and `evidence_ids`. The v0.4.4 warning field
+  semantics therefore cannot be consumed by external agents or benchmarks yet.
+- Required remediation approach: write failing tests first for each blocker,
+  then update the smallest implementation surface. Do not add new MVP 2
+  features until these audit findings pass.
+
 ### RLM Orchestrator REST/MCP Consistency Findings
 
 - Phase 13B already verified the real `_rlm-orchestrator` Mneme session id as
@@ -168,6 +466,127 @@
   `details.reason=NO_EVIDENCE` means the session exists but required evidence
   is absent, and `200 ok=true` with evidence means Mneme is usable for the
   run-start gate. These cases must not be collapsed into "empty memory".
+- v0.5 review polish accepted the contract-level fixes from the new reviewer
+  pass: uniform REST error examples, complete Section 12 control schemas,
+  segment list/close scoping, session export shape, retention cutoff semantics,
+  scoped blob GC, reindex maintenance, multipart ingest rules, single-range
+  blob reads, idempotency coverage, migration-version mismatch failure,
+  graph edge taxonomy/scoring, batch-first ingestion, binary blob redaction
+  caveats, and lower SQLite BLOB defaults.
+- Two reviewer suggestions intentionally remain out of v0. First,
+  model-callable MCP writes such as `append_insight`/`save_decision` are a
+  real TOOLS_ONLY product gap, but they require a separate write approval,
+  threat, and audit contract; v0 keeps MCP read-oriented. Second,
+  `/v1/readiness/session` remains the hard-dependency readiness gate because it
+  was added specifically to avoid conflating liveness, auth, session
+  resolution, and evidence availability. The temporary `context_search top_k=1`
+  fallback is now capability-negotiated only.
+- v0.6 review response accepts the concrete remaining contract fixes:
+  `mneme.segment.v0`, event summaries, segment-close outcome enum, reindex job
+  polling/status enum, retention cleanup authorization, 412 readiness example,
+  and explicit supported schema versions are now first-class requirements.
+- v0.6 changes session export semantics to avoid one huge base64 JSON payload:
+  JSON export is metadata-only by default, `multipart_bundle` is the portable
+  blob-byte path, and `max_export_blob_inline_bytes=0` disables inline blob
+  contents unless a deployment explicitly opts into a bounded diagnostic
+  extension.
+- v0.6 lowers the default SQLite blob limit to 2 MiB and treats larger
+  artifacts as requiring an experimental filesystem driver or a future chunked
+  blob protocol. This trades convenience for local memory/WAL safety.
+- v0.6 resolves the hard-headroom contradiction: headroom is
+  `minimum_headroom_tokens`; unused evidence budget becomes final unused slack,
+  not extra consumed headroom. Oversized latest-user/current-tail content is
+  best-effort truncated by default and errors only for strict callers or when
+  minimum required content cannot fit.
+- v0.6 explicitly prioritizes foreground writes over background embedding,
+  enrichment, reindex, retention, and GC jobs. Provider clients must retry with
+  bounded exponential backoff before marking derived items failed.
+- v0.6 keeps Mneme core honest about freshness: `FRESHNESS_CONFLICT` is emitted
+  only when an adapter/source connector explicitly supplies current/conflicting
+  evidence. Mneme does not secretly read files/git or run hidden semantic diff
+  logic to discover conflicts.
+- v0.6 moves readiness fallback out of normative daemon behavior into alpha
+  compatibility notes. A v0-compliant hard dependency uses authenticated
+  `/v1/readiness/session`; `context_search top_k=1` is only a migration bridge
+  for old daemons.
+- v0.7 review polishing accepts the final UX/security/storage findings rather
+  than moving straight to implementation planning. The key UX decision is that
+  Mneme MUST NOT best-effort truncate the current latest user request; if it
+  cannot fit with authority messages and minimum headroom, the request fails
+  with `LATEST_USER_MESSAGE_EXCEEDS_BUDGET`.
+- v0.7 changes privacy delete semantics: session content and traces are still
+  hard-deleted/redacted, but security-sensitive audit records become
+  anonymized forensic anchors for local owner incident review. This preserves
+  audit usefulness without retaining raw prompts, excerpts, or session ids.
+- v0.7 protects long-running active sessions from automatic retention sweeps.
+  Default retention cleanup applies to closed sessions; active-session cleanup
+  requires explicit OWNER `force_active_cleanup=true`.
+- v0.7 replaces required `multipart/mixed` export with streaming `tar_bundle`
+  for better SDK/DX and memory behavior. JSON remains metadata-only.
+- v0.7 adds concrete SQLite load controls: multipart ingest has total blob byte
+  and transaction byte limits, background jobs use micro-transactions/yields,
+  reindex jobs can be cancelled, and provider backlog drain is throttled.
+- v0.7 demotes `COMPACTION_OWNER` to FUTURE. Mneme v0 can prepare request-only
+  context, but it does not own host transcript compaction until a summarize or
+  compact endpoint is explicitly specified.
+- v0.7.1 is a final contract-polish response to the v0.7 reviews, not a
+  product-scope expansion. It closes implementation-blocking ambiguities while
+  leaving TOOLS_ONLY write-gap, Hermes legacy bridge, resumable export, and
+  reindex rollback as future/public-release strategy items.
+- The remaining v0.7 reviewer blockers accepted into v0.7.1 are: standalone
+  schemas for all listed public types, `AUTH_FAILURE` in the audit enum,
+  retention cleanup request/response contract, active force-cleanup conflict
+  behavior, `session_resolution.source`, reindex-cancel idempotency,
+  normative graph scoring, canonical context budget keys, session id limits,
+  multipart metadata headroom, and unsupported export-format errors.
+- The compliance implementation plan lives in
+  `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`; actual code work should
+  begin with a compliance matrix and baseline test run, not with opportunistic
+  endpoint edits.
+- Comparing v0.7.1 against the original Hermes Context Engine spec shows that
+  Universal Mneme is stronger on API/security/ops, but must not lose Hermes'
+  retrieval intelligence: deterministic intent classification, state-based
+  continuation queries, automatic topic segmentation, selective indexing
+  compression, routing modes, embedding model filtering, and memory-tool
+  feedback continuity belong in Mneme core for `CONTEXT_ENGINE` paths.
+- Host adapters may supply stronger lifecycle signals, but adapter-only
+  ownership of topic drift would recreate the original quality gap across every
+  runtime. v0.7.2 therefore treats runtime-neutral routing and segmentation as
+  compliance requirements, while keeping host-specific hook wiring and any
+  model-callable MCP writes out of v0.
+- The v0.7.2 Hermes parity reviews approve the direction but correctly point
+  out that two areas needed deterministic implementation detail before coding:
+  optional delta extraction and routing scoring. v0.7.3 closes these by adding
+  `mneme.entity_modifier.v0`, extraction/conflict rules, explicit scoring
+  formula, default mode weights, and score-breakdown shape.
+- v0.7.3 also closes high-priority Hermes-parity clarity gaps: default switch
+  phrases and entity contradiction terms now live next to the algorithm,
+  deterministic excerpt fallback is specified for indexing compression,
+  `MEMORY_READ_EVIDENCE` graph edges and memory-read summary format are
+  defined, and segmentation drift score/tool-domain guidance is testable.
+- Product adoption risks from the reviews remain deliberately FUTURE rather
+  than v0 scope: model-callable MCP writes, a Hermes legacy bridge, and
+  `COMPACTION_OWNER`/summarization API require separate threat and API design.
+  v0.7.3 records benchmark/quality metrics expectations without pretending
+  unlabeled runtime requests can report precision/recall.
+- The v0.7.3 hardening review identified real production risks hidden behind
+  otherwise clear contracts: nondeterministic state hashes, graph traversal
+  OOM/timeout potential, readiness checks that could accidentally call
+  providers, model-token-dependent entity contradiction, unbounded writer
+  queues, multipart foreground latency/atomicity, and redaction regex latency.
+  v0.7.4 turns these into explicit limits and tests.
+- v0.7.4 intentionally keeps `best_guess_session_id` rather than renaming it:
+  the field already has stable `AMBIGUOUS`/`NOT_FOUND` semantics and strict
+  guidance. Renaming would create migration churn without closing a concrete
+  safety gap.
+- The final v0.7.4 review approved the specification for v0 implementation and
+  raised only three non-blocking integration polish items. v0.7.5 incorporates
+  them: adapter recovery guidance for `422 REDACTION_TIMEOUT`, provider rate
+  limit/circuit-breaker sharing for provider-enabled readiness checks, and
+  explicit array insertion-order preservation for canonical state hashes.
+- Final reviewer verdict approved v0.7.5 as the target v0 specification. There
+  are no remaining architecture blockers; the next work should execute the
+  Implementation Gap Plan Phase 0 rather than continue specification churn.
 
 ### Current Mneme Prototype Facts
 
@@ -883,3 +1302,12 @@
    - Resolved: Apache License 2.0, with Ivan Konstantinov as the 2026 copyright owner.
 10. Should work move into Hermes adapter planning now?
    - Resolved for now: no. Return to Phase 14 hardening and defer Hermes adapter work until the upstream Hermes context-engine hook PR is accepted.
+
+## Session Findings - 2026-06-22 v0 Compliance Implementation
+
+| Finding | Impact |
+|---|---|
+| `.planning/` is not present in the repository. The active approved-spec workflow for this session must use the root planning/status artifacts named by the user: `task_plan.md`, `findings.md`, `progress.md`, `docs/MNEME_V0_COMPLIANCE_MATRIX.md`, and `docs/MNEME_V0_COMPLIANCE_IMPLEMENTATION_PLAN.md`. | Use `spec-driven-planning` in Reference/Execution mode against the existing approved spec and compliance plan instead of creating a new speculative plan tree before reading the provided sources. |
+| The worktree is already dirty at session start, including spec/status docs and untracked compliance audit/plan docs. | Treat existing changes as user/prior-session work; do not revert unrelated changes and keep new edits tightly scoped. |
+| The installed `security-guidance` skill still references ASVS files that are not present under `data/asvs/`. | Security-sensitive implementation in this session must be traced to concrete Mneme spec sections instead of fabricated ASVS references. Relevant spec anchors for the first slice are Sections 8, 9, 17, 20, 21, 22, and required tests 43, 77, 85, and 118. |
+| Phase 1A capabilities now expose v0 schema vocabulary and foundation limits while keeping unsupported feature flags false for blob store, `/v1/metrics`, project isolation, retention cleanup, and reindex jobs. | Future implementation slices must not treat `supported_schema_versions` entries as proof that the corresponding endpoint/lifecycle is complete; use the explicit `supports_*` flags and compliance matrix rows. |

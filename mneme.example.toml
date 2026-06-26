@@ -37,6 +37,15 @@ dependency_max_depth = 4
 dependency_decay = 0.6
 reranker_top_k = 0
 
+[retrieval.routing]
+default_mode = "general"
+
+[retrieval.routing.weights.general]
+semantic_similarity = 0.40
+recency = 0.20
+dependency = 0.30
+type_weight = 0.10
+
 [enrichment]
 every_n_turns = 5
 on_segment_boundary = true

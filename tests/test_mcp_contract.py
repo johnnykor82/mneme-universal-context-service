@@ -214,8 +214,13 @@ def test_mcp_resolve_session_tool_proxies_rest_envelope() -> None:
             200,
             json={
                 "ok": True,
-                "data": {"resolved_session_id": "codex-session-1", "matches": []},
-                "warnings": [],
+                "data": {
+                    "resolved_session_id": None,
+                    "best_guess_session_id": "codex-session-1",
+                    "resolution": "AMBIGUOUS",
+                    "matches": [],
+                },
+                "warnings": [{"code": "SESSION_RESOLUTION_AMBIGUOUS", "message": "refine filters"}],
             },
         )
 
@@ -240,7 +245,41 @@ def test_mcp_resolve_session_tool_proxies_rest_envelope() -> None:
         "limit": 3,
     }
     assert result["ok"] is True
-    assert result["data"]["resolved_session_id"] == "codex-session-1"
+    assert result["data"]["resolved_session_id"] is None
+    assert result["data"]["best_guess_session_id"] == "codex-session-1"
+    assert result["warnings"][0]["code"] == "SESSION_RESOLUTION_AMBIGUOUS"
+
+
+def test_mcp_cost_report_tool_proxies_rest_tool_route() -> None:
+    from mneme_service.mcp_server import create_mcp_server
+
+    seen: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["method"] = request.method
+        seen["url"] = str(request.url)
+        seen["body"] = request.content.decode("utf-8")
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "data": {"schema_version": "mneme.cost_report.v0", "session_id": "session-1"},
+                "trace_id": None,
+                "warnings": [],
+            },
+        )
+
+    server = create_mcp_server(base_url="http://mneme.test/", transport=httpx.MockTransport(handler))
+
+    result = structured_tool_result(
+        asyncio.run(server.call_tool("mneme_cost_report", {"session_id": "session-1", "range": "SESSION"}))
+    )
+
+    assert seen["method"] == "POST"
+    assert seen["url"] == "http://mneme.test/v1/tools/mneme_cost_report"
+    assert json.loads(seen["body"]) == {"session_id": "session-1", "range": "SESSION", "granularity": "SUMMARY"}
+    assert result["ok"] is True
+    assert result["data"]["schema_version"] == "mneme.cost_report.v0"
 
 
 def test_mcp_rest_memory_tool_parity(tmp_path: Path) -> None:
@@ -261,9 +300,20 @@ def test_mcp_rest_memory_tool_parity(tmp_path: Path) -> None:
                 item["session_id"] for item in mcp_list["data"]["sessions"]
             ]
 
+            paged_payload = {"query": "project-1", "page_size": 1}
+            rest_paged = (await http.post("/v1/tools/list_sessions", json=paged_payload)).json()
+            mcp_paged = await mcp_call(server, "list_sessions", paged_payload)
+            assert mcp_paged["data"]["next_page_token"] == rest_paged["data"]["next_page_token"]
+            assert mcp_paged["data"]["matches_truncated"] == rest_paged["data"]["matches_truncated"]
+
             search_payload = {"query": "assembler failure", "session_id": "session-1", "scope": "SESSION", "top_k": 5}
             rest_search = (await http.post("/v1/tools/context_search", json=search_payload)).json()
             mcp_search = await mcp_call(server, "context_search", search_payload)
+            assert rest_search["session_resolution"] == {
+                "session_id": "session-1",
+                "source": "EXPLICIT_ARGUMENT",
+            }
+            assert mcp_search["session_resolution"] == rest_search["session_resolution"]
             assert [item["event_id"] for item in rest_search["data"]["results"]] == [
                 item["event_id"] for item in mcp_search["data"]["results"]
             ]
@@ -301,13 +351,132 @@ def test_mcp_rest_memory_tool_parity(tmp_path: Path) -> None:
             mcp_explain = await mcp_call(server, "explain_context", explain_payload)
             assert rest_explain["data"] == mcp_explain["data"]
 
-            rest_cost = (await http.get("/v1/costs/session/session-1")).json()
+            rest_cost = (await http.post("/v1/tools/mneme_cost_report", json={"session_id": "session-1"})).json()
             mcp_cost = await mcp_call(server, "mneme_cost_report", {"session_id": "session-1"})
             assert mcp_cost["ok"] is True
-            assert rest_cost["session_id"] == mcp_cost["data"]["session_id"]
-            assert rest_cost["events_ingested"] == mcp_cost["data"]["events_ingested"]
-            assert rest_cost["prepare_calls"] == mcp_cost["data"]["prepare_calls"]
-            assert rest_cost["embedding_batches"] == mcp_cost["data"]["embedding_batches"]
+            assert rest_cost["ok"] is True
+            assert rest_cost["session_resolution"] == {
+                "session_id": "session-1",
+                "source": "EXPLICIT_ARGUMENT",
+            }
+            assert mcp_cost["session_resolution"] == rest_cost["session_resolution"]
+            assert rest_cost["data"]["session_id"] == mcp_cost["data"]["session_id"]
+            assert rest_cost["data"]["events_ingested"] == mcp_cost["data"]["events_ingested"]
+            assert rest_cost["data"]["prepare_calls"] == mcp_cost["data"]["prepare_calls"]
+            assert rest_cost["data"]["embedding_batches"] == mcp_cost["data"]["embedding_batches"]
+
+    asyncio.run(scenario())
+
+
+def test_resolve_session_reports_resolved_by_tool_source(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        http, server = await parity_clients(tmp_path)
+        async with http:
+            await seed_mcp_parity_session(http)
+
+            payload = {"session_id": "session-1"}
+            rest_resolve = (await http.post("/v1/tools/resolve_session", json=payload)).json()
+            mcp_resolve = await mcp_call(server, "resolve_session", payload)
+
+            assert rest_resolve["session_resolution"] == {
+                "session_id": "session-1",
+                "source": "RESOLVED_BY_TOOL",
+            }
+            assert mcp_resolve["session_resolution"] == rest_resolve["session_resolution"]
+
+    asyncio.run(scenario())
+
+
+def test_mcp_trusted_default_session_fills_omitted_session_id(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        app = create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN))
+        transport = httpx.ASGITransport(app=app)
+        http = httpx.AsyncClient(base_url="http://mneme.test", transport=transport, headers=auth_headers())
+        from mneme_service.mcp_server import create_mcp_server
+
+        server = create_mcp_server(
+            base_url="http://mneme.test",
+            token=TOKEN,
+            transport=transport,
+            default_session_id="session-1",
+        )
+        async with http:
+            await seed_mcp_parity_session(http)
+
+            search = await mcp_call(server, "context_search", {"query": "assembler failure", "scope": "SESSION"})
+
+            assert search["ok"] is True
+            assert search["session_resolution"] == {
+                "session_id": "session-1",
+                "source": "TRUSTED_DEFAULT",
+            }
+            assert "event-output" in [item["event_id"] for item in search["data"]["results"]]
+
+    asyncio.run(scenario())
+
+
+def test_mcp_host_injected_default_session_reports_host_injected_source(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        app = create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN))
+        transport = httpx.ASGITransport(app=app)
+        http = httpx.AsyncClient(base_url="http://mneme.test", transport=transport, headers=auth_headers())
+        from mneme_service.mcp_server import create_mcp_server
+
+        server = create_mcp_server(
+            base_url="http://mneme.test",
+            token=TOKEN,
+            transport=transport,
+            default_session_id="session-1",
+            default_session_source="HOST_INJECTED",
+        )
+        async with http:
+            await seed_mcp_parity_session(http)
+
+            state = await mcp_call(server, "get_execution_state", {})
+
+            assert state["ok"] is True
+            assert state["session_resolution"] == {
+                "session_id": "session-1",
+                "source": "HOST_INJECTED",
+            }
+
+    asyncio.run(scenario())
+
+
+def test_mcp_omitted_session_without_trusted_default_returns_validation_error() -> None:
+    from mneme_service.mcp_server import create_mcp_server
+
+    server = create_mcp_server(base_url="http://mneme.test")
+
+    result = structured_tool_result(
+        asyncio.run(server.call_tool("context_search", {"query": "assembler failure", "scope": "SESSION"}))
+    )
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "VALIDATION_ERROR"
+    assert "session_id" in result["error"]["message"]
+
+
+def test_mcp_stale_trusted_default_session_returns_specific_error(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        app = create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN))
+        transport = httpx.ASGITransport(app=app)
+        from mneme_service.mcp_server import create_mcp_server
+
+        server = create_mcp_server(
+            base_url="http://mneme.test",
+            token=TOKEN,
+            transport=transport,
+            default_session_id="missing-session",
+        )
+
+        result = await mcp_call(server, "context_search", {"query": "assembler failure", "scope": "SESSION"})
+
+        assert result["ok"] is False
+        assert result["error"]["code"] == "DEFAULT_SESSION_STALE"
+        assert result["error"]["retryable"] is False
+        assert result["error"]["details"] == {"session_id": "missing-session"}
+        assert result["warnings"][0]["code"] == "RESOLVE_SESSION_REQUIRED"
 
     asyncio.run(scenario())
 
@@ -382,14 +551,14 @@ def test_mcp_memory_tools_write_audit_records_and_traces(tmp_path: Path) -> None
                 {"session_id": "session-1", "seed_event_id": "event-output", "mode": "TOOL_CHAIN", "depth": 2, "max_events": 10},
             )
 
-            exported = (await http.get("/v1/sessions/session-1/export")).json()
+            exported = (await http.get("/v1/sessions/session-1/export?include_audit=true")).json()
             audited_tools = {record["tool"] for record in exported["audit_records"]}
             assert {"context_search", "fetch_event", "expand_context"} <= audited_tools
             assert len([event for event in exported["events"] if event["type"] == "MEMORY_READ"]) >= 3
 
             expected_trace_events = {
                 search["trace_id"]: [item["event_id"] for item in search["data"]["results"]],
-                fetch["trace_id"]: ["event-output", "event-call", "event-decision"],
+                fetch["trace_id"]: ["event-output", *[item["event_id"] for item in fetch["data"]["neighbors"]]],
                 expand["trace_id"]: [item["event_id"] for item in expand["data"]["events"]],
             }
             for trace_id, event_ids in expected_trace_events.items():
@@ -477,12 +646,14 @@ def test_mcp_cli_uses_environment_defaults(monkeypatch: Any) -> None:
 
     monkeypatch.setenv("MNEME_BASE_URL", "http://mneme-env.test")
     monkeypatch.setenv("MNEME_AUTH_TOKEN", "env-token")
+    monkeypatch.setenv("MNEME_MCP_DEFAULT_SESSION_ID", "session-env")
 
     args = build_parser().parse_args(["mcp"])
 
     assert args.base_url == "http://mneme-env.test"
     assert args.token == "env-token"
     assert args.timeout == 10.0
+    assert args.default_session_id == "session-env"
 
 
 def test_mcp_cli_runs_stdio_server_without_starting_daemon(monkeypatch: Any) -> None:
@@ -494,10 +665,17 @@ def test_mcp_cli_runs_stdio_server_without_starting_daemon(monkeypatch: Any) -> 
         def run(self, transport: str = "stdio") -> None:
             calls["transport"] = transport
 
-    def fake_create_mcp_server(*, base_url: str, token: str | None, timeout: float) -> FakeServer:
+    def fake_create_mcp_server(
+        *,
+        base_url: str,
+        token: str | None,
+        timeout: float,
+        default_session_id: str | None,
+    ) -> FakeServer:
         calls["base_url"] = base_url
         calls["token"] = token
         calls["timeout"] = timeout
+        calls["default_session_id"] = default_session_id
         return FakeServer()
 
     def fail_uvicorn_run(*_: Any, **__: Any) -> None:
@@ -506,12 +684,25 @@ def test_mcp_cli_runs_stdio_server_without_starting_daemon(monkeypatch: Any) -> 
     monkeypatch.setattr(cli, "create_mcp_server", fake_create_mcp_server)
     monkeypatch.setattr(cli.uvicorn, "run", fail_uvicorn_run)
 
-    cli.main(["mcp", "--base-url", "http://mneme.test", "--token", "test-token", "--timeout", "3"])
+    cli.main(
+        [
+            "mcp",
+            "--base-url",
+            "http://mneme.test",
+            "--token",
+            "test-token",
+            "--timeout",
+            "3",
+            "--default-session-id",
+            "session-cli",
+        ]
+    )
 
     assert calls == {
         "base_url": "http://mneme.test",
         "token": "test-token",
         "timeout": 3.0,
+        "default_session_id": "session-cli",
         "transport": "stdio",
     }
 
@@ -522,8 +713,9 @@ def test_codex_mcp_usage_docs_are_tools_only_and_config_is_valid() -> None:
 
     guide = guide_path.read_text()
     lower_guide = guide.lower()
-    assert 'mneme serve --db /path/to/mneme.db --token "$MNEME_AUTH_TOKEN"' in guide
-    assert 'mneme mcp --base-url http://127.0.0.1:8765 --token "$MNEME_AUTH_TOKEN"' in guide
+    assert 'mneme serve --db /path/to/mneme.db' in guide
+    assert 'mneme mcp --base-url http://127.0.0.1:8765' in guide
+    assert '--token "$MNEME_AUTH_TOKEN"' not in guide
     assert "agent-callable memory tools" in lower_guide
     assert "does not automatically replace codex internal prompt context" in lower_guide
     assert "MNEME_HOST_ADAPTER_CONTRACT_V0.md" in guide
@@ -608,6 +800,86 @@ def test_rest_client_normalizes_rest_error_to_tool_envelope() -> None:
     assert result["error"]["retryable"] is False
     assert result["error"]["details"] == {"event_id": "missing"}
     assert result["warnings"] == []
+
+
+def test_rest_client_error_mapping_covers_v0_fallback_status_codes() -> None:
+    from mneme_service.rest_client import MnemeRestClient
+
+    async def mapped(status_code: int) -> dict[str, Any]:
+        async def handler(_: httpx.Request) -> httpx.Response:
+            return httpx.Response(status_code, text=f"fallback {status_code}")
+
+        client = MnemeRestClient(base_url="http://mneme.test", transport=httpx.MockTransport(handler))
+        return await client.post_tool("fetch_event", {"session_id": "s1", "event_id": "missing"})
+
+    unsupported = asyncio.run(mapped(415))
+    ranged = asyncio.run(mapped(416))
+    limited = asyncio.run(mapped(429))
+
+    assert unsupported["error"]["code"] == "UNSUPPORTED_MEDIA_TYPE"
+    assert unsupported["error"]["retryable"] is False
+    assert ranged["error"]["code"] == "RANGE_NOT_SATISFIABLE"
+    assert ranged["error"]["retryable"] is False
+    assert limited["error"]["code"] == "RATE_LIMITED"
+    assert limited["error"]["retryable"] is True
+
+
+def test_rest_client_preserves_storage_busy_contract_error() -> None:
+    from mneme_service.rest_client import MnemeRestClient
+
+    async def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            503,
+            json={
+                "error": {
+                    "code": "STORAGE_BUSY",
+                    "message": "Writer queue is full.",
+                    "details": {"queue_depth": 8},
+                }
+            },
+        )
+
+    client = MnemeRestClient(base_url="http://mneme.test", transport=httpx.MockTransport(handler))
+    result = asyncio.run(client.post_tool("context_search", {"session_id": "s1", "query": "pytest"}))
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "STORAGE_BUSY"
+    assert result["error"]["retryable"] is True
+    assert result["error"]["details"] == {"queue_depth": 8}
+
+
+def test_rest_tool_rejects_unsupported_schema_version(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        http, _server = await parity_clients(tmp_path)
+        async with http:
+            await seed_mcp_parity_session(http)
+
+            for path, payload in (
+                (
+                    "/v1/tools/context_search",
+                    {
+                        "schema_version": "mneme.tool_request.v99",
+                        "session_id": "session-1",
+                        "query": "assembler failure",
+                    },
+                ),
+                (
+                    "/v1/tools/mneme_cost_report",
+                    {
+                        "schema_version": "mneme.tool_request.v99",
+                        "session_id": "session-1",
+                    },
+                ),
+            ):
+                rejected = await http.post(path, json=payload)
+
+                assert rejected.status_code == 422
+                body = rejected.json()
+                assert body["error"]["code"] == "VALIDATION_ERROR"
+                assert body["error"]["details"]["field"] == "schema_version"
+                assert body["error"]["details"]["supported_schema_versions"] == ["mneme.tool_request.v0"]
+
+    asyncio.run(scenario())
 
 
 def test_rest_client_normalizes_transport_error_to_tool_envelope() -> None:

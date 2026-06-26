@@ -204,6 +204,9 @@ def test_codex_hook_imports_through_rest_and_replay_is_idempotent(tmp_path: Path
         assert first["session"]["created"] is True
         assert first["events"]["accepted"] == 1
         assert first["events"]["duplicates"] == 0
+        assert first["turn"]["schema_version"] == "mneme.turn_complete_result.v0"
+        assert first["turn"]["turn_id"] == "turn-42"
+        assert first["turn"]["status"] == "COMPLETED"
 
         second = await import_codex_hook_payload(
             sample_hook_payload(),
@@ -215,6 +218,7 @@ def test_codex_hook_imports_through_rest_and_replay_is_idempotent(tmp_path: Path
         assert second["session"]["created"] is False
         assert second["events"]["accepted"] == 0
         assert second["events"]["duplicates"] == 1
+        assert second["turn"] == first["turn"]
 
     asyncio.run(run())
 
@@ -242,6 +246,8 @@ def test_codex_hook_import_capture_file_replays_real_capture_through_rest(tmp_pa
         assert first["payload_count"] == 4
         assert first["accepted"] == 4
         assert first["duplicates"] == 0
+        stop_result = next(item for item in first["results"] if item["event_name"] == "Stop")
+        assert stop_result["turn_completed"] is True
 
         second = await import_codex_hook_capture_file(
             capture_path,
@@ -251,6 +257,8 @@ def test_codex_hook_import_capture_file_replays_real_capture_through_rest(tmp_pa
         )
         assert second["accepted"] == 0
         assert second["duplicates"] == 4
+        replay_stop_result = next(item for item in second["results"] if item["event_name"] == "Stop")
+        assert replay_stop_result["turn_completed"] is True
 
     asyncio.run(run())
 
@@ -605,7 +613,7 @@ def test_codex_hook_render_write_config_keeps_validation_warning_and_token_env()
         assert "--input -" in command
         assert "--dry-run" not in command
         assert "--base-url http://127.0.0.1:9876" in command
-        assert "--token \"$MNEME_TOKEN\"" in command
+        assert "--token" not in command
         assert "--timeout 2.5" in command
 
 
@@ -649,7 +657,7 @@ def test_codex_hook_render_context_preview_config_cli_prints_user_prompt_hook(ca
     assert "--input -" in command
     assert "--event UserPromptSubmit" in command
     assert "--output .local/preview.jsonl" in command
-    assert "--token \"$MNEME_AUTH_TOKEN\"" in command
+    assert "--token" not in command
 
 
 def test_project_local_codex_hooks_file_is_ignored() -> None:

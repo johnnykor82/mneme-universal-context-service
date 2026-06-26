@@ -181,12 +181,7 @@ These mirror MCP tools so non-MCP runtimes can use the same memory operations.
 | `GET` | `/v1/costs/session/{session_id}` | Fetch cost and overhead report for a session. |
 | `GET` | `/v1/sessions/{session_id}/export` | Export stored session data for inspection or migration. |
 | `DELETE` | `/v1/sessions/{session_id}` | Delete a session and derived indexes. |
-
-### Optional Observability Endpoint
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/v1/metrics` | Optional Prometheus-style local metrics for daemon diagnostics. |
+| `GET` | `/v1/metrics` | Local metrics for daemon diagnostics and benchmark/production visibility. |
 
 ## Typical Lifecycle
 
@@ -237,14 +232,30 @@ Response:
   "supports_llm_enrichment": false,
   "supports_context_prepare": true,
   "supports_mcp_tools": true,
+  "supports_session_readiness": true,
+  "supports_blob_store": true,
+  "supports_blob_range_reads": true,
+  "supports_export_bundle": true,
+  "supported_export_formats": ["json", "tar_bundle"],
+  "supports_metrics": true,
+  "metrics_format": "prometheus",
   "auth_schemes": ["BEARER_TOKEN", "UNIX_SOCKET"],
   "max_batch_events": 200,
   "max_event_content_bytes": 1048576,
+  "max_blob_bytes": 2097152,
+  "max_batch_total_blob_bytes": 20971520,
+  "max_multipart_transaction_bytes": 20971520,
+  "max_export_blob_inline_bytes": 0,
+  "max_export_session_memory_bytes": 33554432,
   "max_tool_result_events": 50,
   "supported_schema_versions": {
     "session": ["mneme.session.v0"],
+    "session_start": ["mneme.session_start.v0"],
+    "session_export": ["mneme.session_export.v0"],
+    "session_export_manifest": ["mneme.session_export_manifest.v0"],
     "event_batch": ["mneme.event_batch.v0"],
     "event": ["mneme.event.v0"],
+    "event_summary": ["mneme.event_summary.v0"],
     "turn": ["mneme.turn.v0"],
     "context_prepare_request": ["mneme.context_prepare_request.v0"],
     "context_prepare_response": ["mneme.context_prepare_response.v0"],
@@ -255,7 +266,12 @@ Response:
     "session_lineage": ["mneme.session_lineage.v0"],
     "graph_edge": ["mneme.graph_edge.v0"],
     "execution_state": ["mneme.execution_state.v0"],
-    "state_history_entry": ["mneme.state_history_entry.v0"]
+    "state_history_entry": ["mneme.state_history_entry.v0"],
+    "segment": ["mneme.segment.v0"],
+    "segment_start": ["mneme.segment_start.v0"],
+    "segment_close": ["mneme.segment_close.v0"],
+    "blob": ["mneme.blob.v0"],
+    "reindex_job": ["mneme.reindex_job.v0"]
   }
 }
 ```
@@ -306,12 +322,13 @@ return `404 NOT_FOUND` with discovery guidance. When `require_evidence=true`
 and the session exists but no evidence is returned, the service returns
 `412 FAILED_PRECONDITION` with `details.reason=NO_EVIDENCE`.
 
-Deployment fallback: if an already-running daemon has not yet deployed
+Compatibility note: if an already-running alpha daemon has not yet deployed
 `/v1/readiness/session`, hard-dependency clients such as RLM Orchestrator may
 temporarily call authenticated `POST /v1/tools/context_search` with `top_k=1`
-as the run-start gate. The fallback must still distinguish `401`
-authentication failure, `404` missing session, and `200 ok=true` with zero
-results/no evidence.
+as a migration-only run-start gate after `/v1/capabilities` or version metadata
+shows that readiness is unsupported. This fallback is not v0 compliant daemon
+behavior and must still distinguish `401` authentication failure, `404` missing
+session/tool failure, and `200 ok=true` with zero results/no evidence.
 
 ### `POST /v1/sessions/start`
 
@@ -497,7 +514,7 @@ Validation rules:
   canonical transcript event.
 - If `policy.include_recent_tail=true` and the request exceeds the allowed
   budget, the service should preserve the system prompt when requested and keep
-  a contiguous recent-tail suffix under `budget_split.recent_tail_ratio`.
+  a contiguous recent-tail suffix under `budget_split.protected_tail_ratio`.
   `trace.protected_tail_tokens` reports the token estimate for the protected
   non-system tail.
 - After independently packing state, retrieved context, and recent tail, the
@@ -546,8 +563,8 @@ Request:
     "headroom_ratio": 0.1,
     "budget_split": {
       "execution_state_ratio": 0.05,
-      "retrieved_context_ratio": 0.3,
-      "recent_tail_ratio": 0.55,
+      "retrieved_evidence_ratio": 0.3,
+      "protected_tail_ratio": 0.55,
       "headroom_ratio": 0.1
     },
     "retrieval": {
@@ -602,7 +619,9 @@ Response:
     "execution_state_tokens": 7000,
     "protected_tail_tokens": 52000,
     "retrieved_tokens": 31000,
-    "headroom_tokens": 14000,
+    "minimum_headroom_tokens": 14000,
+    "unused_context_slack_tokens": 1200,
+    "latest_user_message_preserved": true,
     "candidate_count": 24,
     "selected_event_ids": ["event-010", "event-011"],
     "selected_event_refs": [
@@ -963,10 +982,11 @@ final message is unavailable or the caller explicitly asks for chunks.
 ```json
 {
   "format": "BYTES_REF",
-  "uri": "file:///local/mneme/blobs/blob-123",
+  "uri": "mneme-blob://blob-123",
   "hash": "sha256:example",
-  "size_bytes": 10485760,
-  "media_type": "text/plain"
+  "size_bytes": 2097152,
+  "media_type": "text/plain",
+  "storage_owner": "SERVER"
 }
 ```
 
@@ -2063,8 +2083,8 @@ These are review tasks, not unresolved protocol blockers:
    Hermes, Codex/MCP, LangGraph, and OpenAI Agents SDK adapters.
 2. Confirm whether `max_event_content_bytes=1048576` is an acceptable default
    for the reference daemon or should be lowered for safer local operation.
-3. Confirm whether `/v1/metrics` should stay optional in v0 or become required
-   for benchmark and demo diagnostics.
+3. Confirm whether the standalone v0.6 exporter requirements should fully
+   replace this older contract file before the next implementation pass.
 
 ## Implementation Gate
 

@@ -28,10 +28,60 @@ Run tests:
 
 ```bash
 export MNEME_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-mneme serve --db .local/mneme.db --token "$MNEME_AUTH_TOKEN"
+mneme serve --db .local/mneme.db
 ```
 
 The daemon binds to loopback by default.
+
+## Local Storage And At-Rest Guidance
+
+Mneme stores canonical records and server-owned blob bytes in the configured
+SQLite database path, for example `.local/mneme.db`. The default v0 runtime has
+no optional external blob path; server-owned blob bytes live in SQLite. The
+default v0 local storage path does not enable mandatory database encryption.
+
+Use owner-only local storage permissions:
+
+- SQLite database, environment, and token files: `0600`
+- Mneme data directories such as `.local`: `0700`
+
+For stronger at-rest protection, place the Mneme data directory on an
+OS-encrypted volume or use a deployment that provides SQLCipher-compatible
+SQLite encryption. The default local SQLite setup is not enterprise confidential
+unless encryption is configured outside the default v0 runtime.
+
+## Operations Runbook
+
+Config changes require restart of the `mneme serve` process. Stop the daemon
+with the host service manager or a normal process signal, then start it again
+with the same database path and token source.
+
+During stop or restart, in-flight requests may be interrupted. Clients should
+retry responses marked `retryable=true`, and mutating callers should use an
+`Idempotency-Key` so a retried session start, event batch, turn completion,
+context prepare, retention cleanup, blob operation, reindex operation, or
+maintenance command can replay safely instead of duplicating work.
+
+Production operators should retain structured logs that include request id,
+trace id, endpoint, status, and project or session scope metadata. Mneme does
+not log bearer tokens or memory evidence content in operational logs.
+
+## Migration And Release Notes
+
+Stable releases must list tested Python versions and migration impacts. For the
+current v0 line, the tested Python versions are 3.11 and 3.12.
+
+Before any destructive migration, startup requires either an explicit backup
+path or an explicit operator bypass:
+
+```bash
+mneme serve --db .local/mneme.db --backup-before-migrate .local/mneme.before-migrate.db
+```
+
+Use `--no-backup-before-migrate` only after an operator has created and verified
+an out-of-band backup. Release notes for a version with a destructive migration
+must identify the affected schema version, the migration impact, and the backup
+or bypass command used during rollout.
 
 Health check:
 
@@ -55,11 +105,22 @@ curl -sS -X POST http://127.0.0.1:8765/v1/readiness/session \
 Run the MCP server as a separate process and point it at the REST daemon:
 
 ```bash
-mneme mcp --base-url http://127.0.0.1:8765 --token "$MNEME_AUTH_TOKEN"
+mneme mcp --base-url http://127.0.0.1:8765
 ```
 
 The MCP server is a proxy over the REST memory tools. It does not replace the
 host runtime's prompt by itself.
+
+## Run The Local Benchmark
+
+```bash
+mneme benchmark --events 30 --db .local/mneme-benchmark.db
+```
+
+This is a local smoke benchmark with local fake providers and no external
+provider calls. It reports benchmark methodology and labeled synthetic quality
+metrics, but it has no comparative baseline and is not proof of token or cost
+reduction.
 
 ## Multi-Machine Codex Setup
 
