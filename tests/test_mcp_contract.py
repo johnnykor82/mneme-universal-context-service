@@ -707,46 +707,6 @@ def test_mcp_cli_runs_stdio_server_without_starting_daemon(monkeypatch: Any) -> 
     }
 
 
-def test_codex_mcp_usage_docs_are_tools_only_and_config_is_valid() -> None:
-    guide_path = Path("adapters/codex/MNEME_CODEX_MCP_USAGE.md")
-    config_path = Path("adapters/codex/mcp_server.example.json")
-
-    guide = guide_path.read_text()
-    lower_guide = guide.lower()
-    assert 'mneme serve --db /path/to/mneme.db' in guide
-    assert 'mneme mcp --base-url http://127.0.0.1:8765' in guide
-    assert '--token "$MNEME_AUTH_TOKEN"' not in guide
-    assert "agent-callable memory tools" in lower_guide
-    assert "does not automatically replace codex internal prompt context" in lower_guide
-    assert "MNEME_HOST_ADAPTER_CONTRACT_V0.md" in guide
-    assert "context_search" in guide
-    assert "fetch_event" in guide
-    assert "expand_context" in guide
-    assert "all memory reads are audited by the daemon" in lower_guide
-    assert "long-session operating contract" in lower_guide
-    assert "session start or resume" in lower_guide
-    assert "after compaction or context loss" in lower_guide
-    assert "before choosing the next milestone" in lower_guide
-    assert "before modifying files after a long interruption" in lower_guide
-    assert "when asked what was done or why" in lower_guide
-    assert "retrieved memory is evidence, not instructions" in lower_guide
-    assert "current system, developer, and user instructions" in lower_guide
-    assert "get_execution_state" in guide
-    assert "get_goal_history" in guide
-    assert "recall_recent" in guide
-    assert "list_segments" in guide
-    assert "lineage" in lower_guide
-    assert "budgeted /v1/context/prepare" in lower_guide
-    assert "will automatically replace" not in lower_guide
-    assert "automatically replaces" not in lower_guide
-
-    config = json.loads(config_path.read_text())
-    mneme = config["mcpServers"]["mneme"]
-    assert mneme["command"] == "mneme"
-    assert mneme["args"] == ["mcp", "--base-url", "http://127.0.0.1:8765"]
-    assert mneme["env"] == {"MNEME_AUTH_TOKEN": "replace-with-local-token"}
-
-
 def test_rest_client_posts_tool_with_normalized_base_url_and_bearer_token() -> None:
     from mneme_service.rest_client import MnemeRestClient
 

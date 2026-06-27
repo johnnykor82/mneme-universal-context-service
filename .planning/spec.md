@@ -21,6 +21,54 @@ This file is a planning manifest, not a replacement specification.
 explicitly authorizes a spec change. This wrapper may be edited only to keep
 planning pointers and traceability current.
 
+## Approved Extension Scope: Core/Adapter Boundary Refactor
+
+| Role | Path | Authority |
+|---|---|---|
+| Extension source of truth | `docs/MNEME_CORE_ADAPTER_BOUNDARY_REFACTOR_SPEC.md` | Approved Core/Adapter boundary refactor requirements |
+| External review evidence | `.planning/findings.md` | Summary of v0.5 approval cycle: Kimi, DeepSeek, and Owl approved; GLM v0.5 unavailable due provider 429 after approving v0.4 |
+| Planning scope | `.planning/work/11-core-adapter-boundary-and-codex-adapter-sync/plan.md` | Phase 11 plan, pending Planning Gate approval |
+
+`docs/MNEME_CORE_ADAPTER_BOUNDARY_REFACTOR_SPEC.md` is approved for
+spec-driven planning as of 2026-06-27. It is now immutable for Phase 11
+implementation unless the user explicitly authorizes a scope/spec change.
+
+### Extension Spec Format Assessment
+
+The extension spec is reviewer-facing rather than the native
+`spec-driven-planning` template.
+
+| Template area | Extension location | Assessment |
+|---|---|---|
+| Objective and problem | Sections 1-3 | Present |
+| Architecture decision | Section 4 | Present; Variant C is normative |
+| Goals and non-goals | Sections 5-6, 15 | Present |
+| Requirements | Section 7, R-001 through R-009 | Present with stable IDs |
+| Repository/package layout | Sections 8-9 | Present |
+| Migration plan | Section 10 | Present as six phases |
+| Verification | Sections 11-12 | Present with success criteria SC-001 through SC-015 |
+| Risks and approval gate | Sections 13-17 | Present |
+
+Risk: the extension includes cross-repository adapter work that may require a
+separate local checkout and explicit filesystem/network approval before
+execution. Mitigation: Phase 11 Task 02 starts by locating and approving the
+adapter checkout path before any adapter edits.
+
+### Extension Mapping Approach
+
+Phase 11 plan items must map:
+
+`Extension R/SC ID -> spec section -> implementation evidence -> test/check evidence -> reviewer packet evidence`.
+
+The extension's hard boundaries are:
+
+- Core remains host-neutral.
+- Codex behavior moves to `mneme-codex-adapter`.
+- Adapter must not import `mneme_service.*`.
+- Contract/version compatibility must be machine-readable and CI-enforced.
+- Implementation cannot begin until the Phase 11 Planning Gate is explicitly
+  cleared.
+
 ## Spec Format Assessment
 
 The canonical spec is approved but does not use the `spec-driven-planning`
@@ -89,3 +137,4 @@ observed results. Passing alpha tests alone is not v0 compliance.
 |---|---|---|---|
 | 2026-06-22 | Created approved wrapper manifest around Final v0.7.5 | Restore `spec-driven-planning` workflow without rewriting the approved spec | Ivan Konstantinov |
 | 2026-06-22 | Cleared planning gate metadata after user approval | Start implementation under `.planning/` workflow | Ivan Konstantinov |
+| 2026-06-27 | Added approved extension scope for Core/Adapter Boundary Refactor v0.5 | Prepare Phase 11 planning after external review approvals | Ivan Konstantinov |

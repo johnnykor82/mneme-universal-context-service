@@ -52,6 +52,7 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     api_version: str
+    mneme_contract_version: str
     schema_versions: list[str]
 
 
@@ -93,7 +94,7 @@ class SessionStartRequest(FlexiblePayload):
                     "schema_version": "mneme.session_start.v0",
                     "session_id": "session-example",
                     "agent_id": "agent-1",
-                    "runtime": "CODEX",
+                    "runtime": "GENERIC_AGENT",
                     "project_id": "project-1",
                     "privacy": {"project_isolation_key": "project-1"},
                     "metadata": {"cwd": "/repo"},
@@ -271,7 +272,7 @@ class EventBatchRequest(FlexiblePayload):
                             "session_id": "session-example",
                             "turn_id": "turn-1",
                             "agent_id": "agent-1",
-                            "runtime": "CODEX",
+                            "runtime": "GENERIC_AGENT",
                             "role": "USER",
                             "type": "USER_MESSAGE",
                             "timestamp": "2026-06-09T12:00:00Z",
@@ -636,6 +637,7 @@ class DeltaExtractionCapability(BaseModel):
 class CapabilitiesResponse(BaseModel):
     api_version: str
     service_version: str
+    mneme_contract_version: str
     supported_cost_modes: list[str]
     default_cost_mode: str
     strict_cost_mode: bool

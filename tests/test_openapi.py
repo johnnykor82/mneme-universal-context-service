@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -14,6 +15,25 @@ TOKEN = "test-token"
 
 def auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {TOKEN}"}
+
+
+def test_contract_version_is_canonical_across_docs_openapi_and_runtime(tmp_path: Path) -> None:
+    contract_version_path = Path("docs/MNEME_CONTRACT_VERSION")
+    contract_version = contract_version_path.read_text(encoding="utf-8").strip()
+    assert re.fullmatch(r"\d+\.\d+\.\d+", contract_version)
+
+    api = TestClient(create_app(Settings(db_path=tmp_path / "mneme.db", auth_token=TOKEN)))
+
+    openapi = api.get("/openapi.json").json()
+    assert openapi["info"]["version"] == contract_version
+
+    health = api.get("/v1/health")
+    assert health.status_code == 200, health.text
+    assert health.json()["mneme_contract_version"] == contract_version
+
+    capabilities = api.get("/v1/capabilities", headers=auth_headers())
+    assert capabilities.status_code == 200, capabilities.text
+    assert capabilities.json()["mneme_contract_version"] == contract_version
 
 
 def test_capabilities_advertise_v0_foundation_without_overclaiming(tmp_path: Path) -> None:
@@ -62,10 +82,7 @@ def test_capabilities_advertise_v0_foundation_without_overclaiming(tmp_path: Pat
         "complete_turn",
     ]
     assert body["integration_depth"]["adapter_claims"]["mcp"]["level"] == "TOOLS_ONLY"
-    assert body["integration_depth"]["adapter_claims"]["codex_hooks"]["level"] == "EVENT_INGEST"
-    assert body["integration_depth"]["adapter_claims"]["codex_hooks"]["context_prepare"] == "NOT_HOST_PRE_MODEL_REQUEST"
-    assert body["integration_depth"]["adapter_claims"]["codex_context_preview"]["level"] == "TOOLS_ONLY"
-    assert body["integration_depth"]["adapter_claims"]["codex_context_preview"]["context_prepare"] == "PREVIEW_ONLY"
+    assert set(body["integration_depth"]["adapter_claims"]) == {"rest_api", "mcp"}
     assert body["limits"]["max_blob_bytes"] == 2_097_152
     assert body["limits"]["max_session_id_length"] == 256
     assert body["limits"]["idempotency_key_min_retention_seconds"] == 604_800

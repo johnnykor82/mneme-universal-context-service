@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from .app import create_app
 from .config import ProviderSettings, Settings
 
-BENCHMARK_TOKEN = "mneme-benchmark-token"
+BENCHMARK_AUTH_VALUE = "mneme-benchmark-token"
 
 
 class BenchmarkEmbeddingProvider:
@@ -27,7 +27,7 @@ def run_local_benchmark(*, event_count: int = 30, db_path: Path | None = None) -
         raise ValueError("event_count must be positive")
     resolved_db = db_path or Path(".local/mneme-benchmark.db")
     resolved_db.parent.mkdir(parents=True, exist_ok=True)
-    token = BENCHMARK_TOKEN
+    token = BENCHMARK_AUTH_VALUE
     provider = BenchmarkEmbeddingProvider()
     settings = Settings(
         db_path=resolved_db,

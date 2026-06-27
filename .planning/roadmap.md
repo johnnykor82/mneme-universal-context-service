@@ -21,6 +21,21 @@ Bring the current Mneme alpha implementation into verifiable compliance with
 Execution may proceed under the active path. Commit/push still require separate
 explicit permission.
 
+## Extension Planning Gate: Phase 11 Core/Adapter Boundary
+
+- [x] Extension spec approved for planning:
+  `docs/MNEME_CORE_ADAPTER_BOUNDARY_REFACTOR_SPEC.md`
+- [x] Extension Spec Format Assessment recorded in `.planning/spec.md`
+- [x] Phase 11 added to roadmap
+- [x] Phase 11 `plan.md` exists
+- [x] Detailed task `plan.md` files exist for Phase 11
+- [x] User has reviewed and explicitly approved the Phase 11 plan structure
+
+**Gate Status: CLEARED - 2026-06-27**
+
+Phase 11 implementation may proceed under the active path. Commit/push still
+require separate explicit permission.
+
 ## Active Phase
 
 Active Phase: none
@@ -107,6 +122,14 @@ Active Phase: none
 - Effort: 0.5-1 focused implementation cycle
 - Plan: `.planning/work/10-final-acceptance-reviewer-packet/plan.md`
 
+### 11-core-adapter-boundary-and-codex-adapter-sync
+- Status: complete
+- Goal: Restore and enforce the Core/Adapter boundary by moving Codex-specific behavior to the standalone adapter, adding contract/version enforcement, and proving cross-repository compatibility.
+- Spec coverage: `docs/MNEME_CORE_ADAPTER_BOUNDARY_REFACTOR_SPEC.md` Sections 4-12, R-001 through R-009, SC-001 through SC-015
+- Matrix rows: post-v0 extension; not part of `docs/MNEME_V0_COMPLIANCE_MATRIX.md` closure, but must preserve final v0 compliance
+- Effort: 3-6 focused implementation cycles after Planning Gate approval, plus adapter checkout/repository coordination
+- Plan: `.planning/work/11-core-adapter-boundary-and-codex-adapter-sync/plan.md`
+
 ## Transition Criteria
 
 | Transition | Criteria |
@@ -122,6 +145,9 @@ Active Phase: none
 | Phase 8 -> Phase 9 | MCP/REST parity and session-resolution tests pass |
 | Phase 9 -> Phase 10 | Package/benchmark docs are review-ready |
 | Phase 10 -> v0 acceptance | Final Acceptance Contract below is satisfied with evidence |
+| v0 acceptance -> Phase 11 planning | Core/Adapter Boundary Refactor spec approved for planning |
+| Phase 11 planning -> Phase 11 execution | User explicitly approves the Phase 11 plan and clears the Extension Planning Gate |
+| Phase 11 -> post-refactor acceptance | Core boundary checks, adapter tests, cross-repository CI, runtime smoke, and reviewer packet evidence all pass |
 
 ## Verification Gates
 
@@ -130,6 +156,9 @@ Active Phase: none
 - Compile check: `env TMPDIR=/private/tmp .venv/bin/python -m compileall -q mneme_service tests`.
 - Diff hygiene: `git diff --check`.
 - Compliance update: matrix row evidence and Section 24 mapping updated.
+- Phase 11 extension checks: boundary policy, distribution boundary,
+  contract-version consistency, adapter import boundary, adapter contract drift,
+  cross-repository CI evidence JSON, and clean runtime smoke.
 
 ## Final Acceptance Contract
 
@@ -153,12 +182,12 @@ The roadmap is not complete until all of these are true:
 
 | Metric | Value |
 |---|---|
-| Total phases | 10 |
-| Complete | 10 |
+| Total phases | 11 |
+| Complete | 11 |
 | In progress | 0 |
 | Pending | 0 |
 | Cancelled | 0 |
-| Last updated | 2026-06-26 |
+| Last updated | 2026-06-27 |
 
 ## Decisions Made
 
@@ -166,6 +195,7 @@ The roadmap is not complete until all of these are true:
 |---|---|---|
 | Use `01-contract-security-foundation` as the first phase | Audit moved project isolation, safe token handling, and auth-failure audit into foundation work with contract/OpenAPI | 2026-06-22 |
 | Treat root planning files as legacy input only | Current user instruction forbids using root planning files as `.planning/` substitutes | 2026-06-22 |
+| Add Phase 11 as an extension rather than replacing `.planning/spec.md` | Preserve completed v0 compliance history while planning the approved Core/Adapter boundary refactor | 2026-06-27 |
 
 ## Risks And Open Questions
 

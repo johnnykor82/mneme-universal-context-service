@@ -1,5 +1,7 @@
 """Mneme local context service MVP."""
 
-__all__ = ["__version__"]
+from .version import CONTRACT_VERSION, PACKAGE_VERSION
 
-__version__ = "0.1.0"
+__all__ = ["__version__", "CONTRACT_VERSION", "PACKAGE_VERSION"]
+
+__version__ = PACKAGE_VERSION

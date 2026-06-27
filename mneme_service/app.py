@@ -103,6 +103,7 @@ from .storage import (
 )
 from .tool_names import TOOL_NAMES
 from .utils import canonical_json, new_id, now_ms, sha256_text, text_from_content, token_estimate
+from .version import CONTRACT_VERSION, PACKAGE_VERSION
 
 ACCESS_LOGGER = logging.getLogger("mneme_service.access")
 
@@ -388,7 +389,7 @@ def create_app(
             enrichment_provider or HttpLLMEnrichmentProvider(settings.llm_enrichment),
             provider_health["llm_enrichment"],
         )
-    app = FastAPI(title="Mneme Context Service", version="0.1.0")
+    app = FastAPI(title="Mneme Context Service", version=CONTRACT_VERSION)
     app.state.settings = settings
     app.state.store = store
     app.state.embedding_index = embedding_index
@@ -1328,6 +1329,7 @@ def create_app(
             "status": "OK",
             "service": "mneme-context-service",
             "api_version": "v1",
+            "mneme_contract_version": CONTRACT_VERSION,
             "schema_versions": ["mneme.session.v0", "mneme.event.v0", "mneme.trace.v0"],
         }
 
@@ -1339,7 +1341,8 @@ def create_app(
     async def capabilities(_principal: Principal = Depends(require_auth)) -> dict[str, Any]:
         return {
             "api_version": "v1",
-            "service_version": "0.1.0",
+            "service_version": PACKAGE_VERSION,
+            "mneme_contract_version": CONTRACT_VERSION,
             "supported_cost_modes": ["MINIMAL", "STANDARD", "QUALITY"],
             "default_cost_mode": "STANDARD",
             "strict_cost_mode": settings.strict_cost_mode,
@@ -1400,18 +1403,6 @@ def create_app(
                         "level": "TOOLS_ONLY",
                         "host_lifecycle": [],
                         "context_prepare": "MANUAL_TOOL",
-                        "writes_enabled_by_default": False,
-                    },
-                    "codex_hooks": {
-                        "level": "EVENT_INGEST",
-                        "host_lifecycle": ["SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"],
-                        "context_prepare": "NOT_HOST_PRE_MODEL_REQUEST",
-                        "writes_enabled_by_default": False,
-                    },
-                    "codex_context_preview": {
-                        "level": "TOOLS_ONLY",
-                        "host_lifecycle": [],
-                        "context_prepare": "PREVIEW_ONLY",
                         "writes_enabled_by_default": False,
                     },
                 },

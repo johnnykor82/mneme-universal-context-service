@@ -122,23 +122,15 @@ provider calls. It reports benchmark methodology and labeled synthetic quality
 metrics, but it has no comparative baseline and is not proof of token or cost
 reduction.
 
-## Multi-Machine Codex Setup
+## Host Adapters
 
-If two Codex machines share project files through symlinked directories, do not
-assume Mneme is installed on both machines just because the shared files are
-visible. Shared symlink files can carry docs, skills, snippets, and examples,
-but runtime pieces remain per-machine:
+Mneme Core installs the daemon, REST API, and MCP server. Host lifecycle
+capture, trust prompts, local setup helpers, and agent-specific skills belong
+in separate host adapters that consume the public REST/MCP contract.
 
-- create or verify the local Python environment;
-- install the Mneme package or editable checkout;
-- start or install `mneme serve` with a local database path;
-- configure `mneme mcp` in that machine's Codex environment;
-- set local tokens and provider secrets;
-- review and trust hook config on that machine;
-- run `mneme-codex codex-hook-capture` locally before enabling hook ingestion.
-
-For future automated installers, treat each host as a separate install target
-and provide an idempotent per-machine verify command.
+For Codex integration, use the separate `johnnykor82/mneme-codex-adapter`
+repository/package. Core keeps only the host-neutral contract in
+[MNEME_HOST_ADAPTER_CONTRACT_V0.md](MNEME_HOST_ADAPTER_CONTRACT_V0.md).
 
 ## Optional Providers
 

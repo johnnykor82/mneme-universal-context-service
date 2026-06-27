@@ -180,18 +180,6 @@ def test_auth_health_capabilities_and_session_idempotency(tmp_path: Path) -> Non
                 "context_prepare": "MANUAL_TOOL",
                 "writes_enabled_by_default": False,
             },
-            "codex_hooks": {
-                "level": "EVENT_INGEST",
-                "host_lifecycle": ["SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"],
-                "context_prepare": "NOT_HOST_PRE_MODEL_REQUEST",
-                "writes_enabled_by_default": False,
-            },
-            "codex_context_preview": {
-                "level": "TOOLS_ONLY",
-                "host_lifecycle": [],
-                "context_prepare": "PREVIEW_ONLY",
-                "writes_enabled_by_default": False,
-            },
         },
     }
     assert "mneme.event.v0" in body["supported_schema_versions"]["event"]

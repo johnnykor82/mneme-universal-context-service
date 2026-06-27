@@ -1,0 +1,69 @@
+{
+  "schema_version": "mneme.phase11.task02.adapter_verification.v0",
+  "verified_at_utc": "2026-06-27T07:55:28Z",
+  "result": "pass",
+  "core": {
+    "repository": ".",
+    "branch": "main",
+    "commit": "40a6699057d802e4381a6847fa694b7104124294",
+    "worktree": "dirty; wheel built from current working tree including Phase 11 Task 01 changes",
+    "artifact": "<tmp>/mneme-core-dist-phase11/mneme_context_service-0.1.0-py3-none-any.whl",
+    "artifact_sha256": "20c5ea772459b0d44689bf140bd8cf1ef0888720a0d7a50b0087b61a557fbb94",
+    "contract_version": "0.7.5",
+    "openapi_fixture": "<tmp>/mneme-openapi-phase11/openapi.json"
+  },
+  "adapter": {
+    "repository": "<adapter-checkout>",
+    "remote": "https://github.com/johnnykor82/mneme-codex-adapter.git",
+    "branch": "codex/phase11-adapter-sync",
+    "base_commit": "2a7628631198d0938d52e05fb69a916ad604bcf4",
+    "worktree": "verified as a dirty local patch, then committed and pushed as bd69b15e5716bb7731256aeba85ae45963be399a",
+    "published_commit": "bd69b15e5716bb7731256aeba85ae45963be399a",
+    "version": "0.1.4",
+    "supported_core_contract_range": ">=0.7,<0.8",
+    "patch_evidence": ".planning/work/11-core-adapter-boundary-and-codex-adapter-sync/02-codex-adapter-sync-first/mneme-codex-adapter-sync.patch"
+  },
+  "checks": [
+    {
+      "name": "Known adapter RED before sync",
+      "command": "env TMPDIR=<tmp> PYTHONPATH=<adapter-checkout>:. .venv/bin/python -m pytest tests/test_codex_ingest.py::test_codex_transcript_imports_through_rest_and_replay_is_idempotent tests/test_codex_hooks.py::test_codex_hook_prepare_preview_writes_context_file tests/test_setup.py::test_status_reports_missing_daemon_without_token_leak -q",
+      "result": "3 focused failures reproduced separately: RECORDED vs COMPLETED, stale budget_split keys, and host LaunchAgent plist collision"
+    },
+    {
+      "name": "Adapter local suite after sync",
+      "command": "env TMPDIR=<tmp> PYTHONPATH=<adapter-checkout>:. .venv/bin/python -m pytest -q",
+      "result": "39 passed before range-check addition; final isolated suite below supersedes this"
+    },
+    {
+      "name": "Core OpenAPI drift check",
+      "command": "<adapter-verify-venv>/bin/python scripts/check_core_contract_drift.py --openapi <tmp>/mneme-openapi-phase11/openapi.json",
+      "result": "PASS: core contract drift check"
+    },
+    {
+      "name": "Adapter import boundary",
+      "command": "<adapter-verify-venv>/bin/python scripts/check_no_core_internal_imports.py",
+      "result": "exit 0"
+    },
+    {
+      "name": "Isolated adapter suite against fresh Core wheel",
+      "command": "env TMPDIR=<tmp> <adapter-verify-venv>/bin/python -m pytest -q",
+      "result": "40 passed"
+    },
+    {
+      "name": "Isolated compile",
+      "command": "env TMPDIR=<tmp> <adapter-verify-venv>/bin/python -m compileall -q mneme_codex_adapter tests scripts",
+      "result": "exit 0"
+    },
+    {
+      "name": "Adapter diff hygiene",
+      "command": "git diff --check",
+      "result": "exit 0"
+    },
+    {
+      "name": "Installed package identity",
+      "command": "<adapter-verify-venv>/bin/python - <<'PY'\nimport mneme_service, mneme_codex_adapter\nprint(mneme_service.__file__)\nprint(mneme_codex_adapter.__file__)\nPY",
+      "result": "Core imported from <adapter-verify-venv>/lib/python3.13/site-packages/mneme_service/__init__.py; adapter version 0.1.4 with range >=0.7,<0.8"
+    }
+  ],
+  "publication_gate": "Adapter patch was committed and pushed to GitHub main after post-completion skill/hook hardening."
+}

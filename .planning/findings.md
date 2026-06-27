@@ -1401,3 +1401,101 @@ Notable implications:
   canonical spec rather than the older draft baseline. Treat the current file as
   the immutable source for this workflow unless the user explicitly authorizes a
   spec change; do not revert it as cleanup.
+
+## 2026-06-27 - Phase 11 Core/Adapter Boundary Planning Findings
+
+- `docs/MNEME_CORE_ADAPTER_BOUNDARY_REFACTOR_SPEC.md` reached v0.5 and was
+  accepted by the user as the ready specification for the Core/Adapter boundary
+  refactor.
+- Final v0.5 external approval evidence: Kimi, DeepSeek, and Owl returned
+  `APPROVE`; GLM v0.5 was unavailable due repeated provider 429 after having
+  approved v0.4.
+- Existing v0 compliance `.planning/` remains the project planning root. Phase
+  11 is added as an extension scope rather than replacing `.planning/spec.md`
+  or erasing completed Phase 1-10 evidence.
+- Mneme MCP session resolution for this workspace returned `NOT_FOUND`, so
+  local `.planning/` files remain the recovery source for this transition.
+- Phase 11 execution must not start until the new Extension Planning Gate is
+  explicitly cleared by the user.
+
+## 2026-06-27 - Phase 11 Task 01 Contract-Version Surface Findings
+
+- Current Core version surfaces are duplicated: `mneme_service/__init__.py`
+  defines `__version__ = "0.1.0"`, `create_app()` passes FastAPI
+  `version="0.1.0"`, and `/v1/capabilities` returns
+  `service_version: "0.1.0"`.
+- `/v1/health` and `/v1/capabilities` response models do not yet include
+  `mneme_contract_version`.
+- `docs/MNEME_CONTRACT_VERSION` and `docs/MNEME_HOST_ADAPTER_CONTRACT_V0.md`
+  are absent before Task 01 implementation.
+- Runtime code should not depend solely on a repository-root `docs/` path when
+  installed from a wheel; Task 01 will keep a package fallback constant and use
+  tests plus later Phase 5 CI checks to enforce equality with the canonical docs
+  file.
+
+## 2026-06-27 - Phase 11 Task 02 Adapter Sync Findings
+
+- No local standalone `mneme-codex-adapter` checkout existed under the searched
+  local project scopes; the task cloned the public repository into
+  `/private/tmp/mneme-codex-adapter-phase11`.
+- Adapter tests had real drift against current Core:
+  - `tests/test_codex_ingest.py` expected turn status `RECORDED`, but Core
+    final turn-complete behavior returns `COMPLETED`.
+  - `mneme_codex_adapter/hooks.py` used stale context-prepare budget keys
+    `retrieved_context_ratio` and `recent_tail_ratio`; Core requires
+    `retrieved_evidence_ratio` and `protected_tail_ratio`.
+  - `tests/test_setup.py` assumed `com.mneme.codex.plist` is absent, which can
+    be false on a developer machine with a real LaunchAgent installed.
+- Adapter source had no private `mneme_service.*` imports, but tests still use
+  Core public package imports to construct in-process ASGI test fixtures. The
+  new import-boundary script scans adapter package source by default and ignores
+  tests unless explicitly requested.
+- The adapter package now declares `CORE_CONTRACT_RANGE = ">=0.7,<0.8"` and
+  mirrors it in `[tool.mneme].supported_core_contract`; the drift-check script
+  fails if Core OpenAPI `info.version` falls outside that range.
+- Task 02 verification was initially local and durable through a saved
+  patch/evidence file. Adapter publication was treated as a separate gate before
+  any final release claim.
+- Superseded 2026-06-27: the adapter patch was later committed and pushed to
+  GitHub `main` as `bd69b15e5716bb7731256aeba85ae45963be399a`.
+
+## 2026-06-27 - Phase 11 Task 03 Dependency Extraction Findings
+
+- Core-side Codex logic is adapter-owned end to end: transcript parsing, hook
+  normalization, context-preview request construction, setup/status/service
+  helpers, command rendering, Codex docs/examples, and the `mneme-memory` skill.
+- The audit found no `promote to Core` units. Generic behavior needed by the
+  adapter is already represented by public REST/MCP contracts and OpenAPI.
+- Task 04 must preserve generic Core coverage for sessions, events,
+  turn-complete, context-prepare, OpenAPI schemas, Core CLI non-Codex commands,
+  distribution boundaries, and Core docs pointer behavior before deleting
+  Codex-specific tests/files.
+- Historical compliance/reviewer docs may keep Codex references as evidence,
+  but active Core package/docs/tests must not depend on Codex implementation.
+## 2026-06-27 - Phase 11 Task 04 Build Cache And Local Build Tooling
+
+- A stale generated `build/` cache can cause setuptools wheel builds to include
+  deleted Core files such as `mneme_service/codex_*.py` even after those files
+  are removed from the working tree. Task 04 verification must clean generated
+  build cache before distribution-boundary checks.
+- The project venv did not have the PyPA `build` CLI available, and network
+  installation was unavailable. Local verification used the bundled Python's
+  `setuptools.build_meta` backend to produce wheel/sdist artifacts in a
+  temporary external artifact directory. CI still installs `build` explicitly.
+- Boundary source-text checks should avoid false positives on neutral technical
+  identifiers such as SQLite `cursor`; package/path checks remain strict for
+  host-specific module and test names.
+
+## 2026-06-27 - Phase 11 Task 05 Spark Limit And CI Guard Details
+
+- A delegated Spark audit for Task 05 could not complete because the separate
+  Spark usage limit was exhausted until 2026-06-29. Task 05 review and fixes
+  were completed in the parent session.
+- `scripts/host_boundary_policy.json` should stay on the approved four-key
+  schema (`version`, `denylist`, `allowlist`, `exemptions`). False positives
+  such as SQLite `cursor` are handled in the checker logic rather than by
+  adding non-spec policy keys.
+- The adapter patch evidence originally had AST import-boundary CI but not a
+  required contract-drift CI step. Task 05 updated the adapter patch evidence
+  so adapter CI generates a Core OpenAPI fixture from the installed Core
+  dependency and runs `scripts/check_core_contract_drift.py`.

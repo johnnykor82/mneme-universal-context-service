@@ -1,0 +1,24 @@
+{
+  "adapter_status_token_safe": true,
+  "checks": {
+    "capabilities_contract_version": "0.7.5",
+    "fetch_event_id": "codex-phase11-runtime-smoke-1782550735-turn-1-0001",
+    "first_ingest": {
+      "accepted": 3,
+      "created": true,
+      "duplicates": 0
+    },
+    "health": "OK",
+    "replay_ingest": {
+      "accepted": 0,
+      "created": false,
+      "duplicates": 3
+    },
+    "search_result_count": 4
+  },
+  "core_contract_version": "0.7.5",
+  "redaction_verified": true,
+  "result": "pass",
+  "schema_version": "mneme.phase11.runtime_smoke.v0",
+  "session_id": "phase11-runtime-smoke-1782550735"
+}

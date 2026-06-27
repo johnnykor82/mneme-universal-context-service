@@ -1,0 +1,25 @@
+{
+  "version": "1",
+  "entries": [
+    {
+      "pattern": "^(?:[^!]+!)?.*tests/.*:\\d+:(user_home_path|api_key_prefix|bearer_literal|private_database_url|env_assignment):",
+      "scope": "tests",
+      "reason": "Tests use fake secret-shaped fixtures to verify redaction, auth, and leakage prevention."
+    },
+    {
+      "pattern": "^docs/MNEME_STANDALONE_SPEC\\.md:\\d+:(api_key_prefix|private_database_url):",
+      "scope": "spec-detector-examples",
+      "reason": "Canonical spec enumerates detector token prefixes and database URL patterns."
+    },
+    {
+      "pattern": "^docs/MNEME_CORE_ADAPTER_BOUNDARY_REFACTOR_SPEC\\.md:\\d+:(user_home_path|windows_home_path|api_key_prefix|private_database_url):",
+      "scope": "spec-detector-examples",
+      "reason": "Boundary refactor spec documents the publication hygiene detectors themselves."
+    },
+    {
+      "pattern": "^docs/RLM_ORCHESTRATOR_DEVELOPMENT_SPEC\\.md:\\d+:(api_key_prefix|private_database_url|env_assignment):",
+      "scope": "historical-development-spec",
+      "reason": "Historical RLM orchestrator spec includes redacted detector examples, not live credentials."
+    }
+  ]
+}

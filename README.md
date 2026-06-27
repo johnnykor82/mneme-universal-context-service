@@ -22,17 +22,20 @@ provide a host lifecycle hook.
 
 ## Integration Depth
 
-Mneme has two integration modes:
+Mneme Core exposes host-neutral REST/MCP capabilities. Host-specific lifecycle
+behavior belongs in adapters.
 
 - `TOOLS_ONLY`: MCP clients can call memory tools such as `context_search`,
   `fetch_event`, and `expand_context`. This does not automatically replace the
   host runtime's prompt.
-- `CONTEXT_ENGINE`: a host adapter calls REST lifecycle hooks, including
-  `/v1/context/prepare`, before model requests. This is required for automatic
-  request-context assembly.
+- `EVENT_INGEST`: a host adapter maps lifecycle events to Mneme sessions,
+  events, and turn completion.
+- Deeper levels such as `PREPARE_INPUT` or `CONTEXT_ENGINE` require an adapter
+  to own the host pre-model-request lifecycle. Core exposes request-only
+  endpoints; it does not secretly mutate host prompts.
 
-See [MNEME_HOST_ADAPTER_CONTRACT_V0.md](MNEME_HOST_ADAPTER_CONTRACT_V0.md) for
-the host adapter contract.
+See [docs/MNEME_HOST_ADAPTER_CONTRACT_V0.md](docs/MNEME_HOST_ADAPTER_CONTRACT_V0.md)
+for the host adapter contract.
 
 ## Specification
 
@@ -98,14 +101,15 @@ See [docs/PROVIDER_CONFIGURATION.md](docs/PROVIDER_CONFIGURATION.md).
 
 For installation details, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
-## Adapter Status
+## Integrations
 
-This development checkout currently contains Codex adapter work under
-`adapters/codex` while the public split is being prepared. The public engine/core
-and Codex adapter repos/packages are separate; the core package remains host-runtime-neutral.
+Mneme Core stays host-runtime-neutral. Host lifecycle capture, setup commands,
+skills, and agent-specific guidance live in host adapters.
 
-Codex can use Mneme through MCP as agent-callable memory tools. This is
-tools-only integration, not automatic prompt replacement.
+For Codex integration, see `johnnykor82/mneme-codex-adapter`. Core documents
+the stable adapter contract in
+[docs/MNEME_HOST_ADAPTER_CONTRACT_V0.md](docs/MNEME_HOST_ADAPTER_CONTRACT_V0.md).
+MCP access is agent-callable memory tooling, not automatic prompt replacement.
 
 ## Tests
 

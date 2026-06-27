@@ -1,0 +1,1033 @@
+diff --git a/.agents/skills/mneme-memory/SKILL.md b/.agents/skills/mneme-memory/SKILL.md
+index dbf40ea..3270470 100644
+--- a/.agents/skills/mneme-memory/SKILL.md
++++ b/.agents/skills/mneme-memory/SKILL.md
+@@ -31,25 +31,56 @@ and prior assistant reasoning.
+ MCP remains read-only in this Codex workflow. Do not invent write behavior or
+ claim that MCP replaces Codex prompt context.
+ 
++## Session Resolution Contract
++
++Before calling any Mneme read tool that accepts or requires `session_id`,
++establish the working Mneme session id first. This applies to
++`context_search`, `fetch_event`, `expand_context`, `recall_recent`,
++`list_segments`, `get_execution_state`, `get_goal_history`, `explain_context`,
++and `mneme_cost_report`.
++
++Use this order:
++
++1. If the user, current local context, a trusted hook/importer output, or a
++   prior Mneme response already supplied an exact valid `session_id`, use it.
++2. Otherwise call `mcp__mneme.resolve_session` with the current workspace
++   `project_path` and any available `thread_id`, `slug`, or task query.
++3. If resolution is missing or ambiguous, call `mcp__mneme.list_sessions` with
++   `project_path` and/or query. Prefer a single latest `ACTIVE` match whose
++   `project_id` or `metadata.cwd` exactly matches the current workspace.
++4. If multiple plausible matches remain, do not guess silently. State the
++   candidates and ask for clarification, or continue without Mneme evidence if
++   the task can proceed safely.
++
++Never infer a current session from recency alone, a repo slug, project name, or
++values like `default`. Do not call session-bound tools without `session_id` just
++to test whether a default exists. Even when using `scope: GLOBAL`, pass the
++working `session_id` as the auth/isolation anchor.
++
+ ## Recovery Workflow
+ 
+ 1. Read the local planning files.
+-2. If Mneme MCP is available, call `mcp__mneme.get_execution_state` for the
+-   relevant `session_id`.
+-3. Call `mcp__mneme.get_goal_history` when reconstructing why the current goal
++2. Establish the working `session_id` using the Session Resolution Contract.
++3. Call `mcp__mneme.get_execution_state` with the working `session_id`.
++4. Call `mcp__mneme.get_goal_history` with the working `session_id` when
++   reconstructing why the current goal
+    changed.
+-4. Call `mcp__mneme.context_search` for semantic evidence about the current
+-   question or implementation area.
+-5. Use `mcp__mneme.fetch_event` for the source event behind an important search
+-   hit.
+-6. Use `mcp__mneme.expand_context` when a fetched event depends on tool calls,
+-   decisions, or adjacent events.
+-7. Use `mcp__mneme.recall_recent` for recent-turn reconstruction.
+-8. Use `mcp__mneme.list_segments` to inspect topic boundaries in long sessions.
+-9. Use `mcp__mneme.explain_context` when you need to justify why evidence was
++5. Call `mcp__mneme.context_search` with the working `session_id` for semantic
++   evidence about the current question or implementation area. Use
++   `scope: GLOBAL` only with the working `session_id` present as anchor.
++6. Use `mcp__mneme.fetch_event` with the working `session_id` for the source
++   event behind an important search hit.
++7. Use `mcp__mneme.expand_context` with the working `session_id` when a fetched
++   event depends on tool calls, decisions, or adjacent events.
++8. Use `mcp__mneme.recall_recent` with the working `session_id` for recent-turn
++   reconstruction.
++9. Use `mcp__mneme.list_segments` with the working `session_id` to inspect
++   topic boundaries in long sessions.
++10. Use `mcp__mneme.explain_context` when you need to justify why evidence was
+    selected or dropped.
+-10. Use `mcp__mneme.mneme_cost_report` when checking provider-safe behavior,
+-   optional embeddings/reranking/enrichment cost, or dogfood health.
++11. Use `mcp__mneme.mneme_cost_report` with the working `session_id` when
++   checking provider-safe behavior, optional embeddings/reranking/enrichment
++   cost, or dogfood health.
+ 
+ ## Evidence Rules
+ 
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 2d1769b..9b81614 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -30,5 +30,35 @@ jobs:
+       - name: Test
+         run: python -m pytest -q
+ 
++      - name: Import boundary
++        run: python scripts/check_no_core_internal_imports.py
++
++      - name: Generate Core OpenAPI fixture
++        run: |
++          mkdir -p .tmp
++          python - <<'PY'
++          import json
++          import tempfile
++          from pathlib import Path
++
++          from fastapi.testclient import TestClient
++          from mneme_service.app import create_app
++          from mneme_service.config import Settings
++
++          with tempfile.TemporaryDirectory(prefix="mneme-adapter-openapi-") as temp_dir:
++              client = TestClient(
++                  create_app(Settings(db_path=Path(temp_dir) / "mneme.db", auth_token="ci-token"))
++              )
++              response = client.get("/openapi.json")
++              response.raise_for_status()
++              Path(".tmp/core-openapi.json").write_text(
++                  json.dumps(response.json(), sort_keys=True),
++                  encoding="utf-8",
++              )
++          PY
++
++      - name: Core contract drift
++        run: python scripts/check_core_contract_drift.py --openapi .tmp/core-openapi.json
++
+       - name: Compile
+-        run: python -m compileall -q mneme_codex_adapter tests
++        run: python -m compileall -q mneme_codex_adapter tests scripts
+diff --git a/README.md b/README.md
+index eae4522..0956354 100644
+--- a/README.md
++++ b/README.md
+@@ -66,6 +66,12 @@ python -m pip install "git+https://github.com/johnnykor82/mneme-codex-adapter.gi
+ 
+ The adapter depends on the public Mneme core package.
+ 
++## Compatibility
++
++This adapter supports Mneme Core contract `>=0.7,<0.8`. The Core contract
++version is published by Mneme Core through `/v1/health`, `/v1/capabilities`,
++and OpenAPI `info.version`.
++
+ ## Run Mneme Core
+ 
+ ```bash
+diff --git a/mneme_codex_adapter/__init__.py b/mneme_codex_adapter/__init__.py
+index 03a8f90..b831146 100644
+--- a/mneme_codex_adapter/__init__.py
++++ b/mneme_codex_adapter/__init__.py
+@@ -1,5 +1,6 @@
+ """Codex adapter utilities for Mneme."""
+ 
+-__all__ = ["__version__"]
++__all__ = ["CORE_CONTRACT_RANGE", "__version__"]
+ 
+-__version__ = "0.1.3"
++__version__ = "0.1.4"
++CORE_CONTRACT_RANGE = ">=0.7,<0.8"
+diff --git a/mneme_codex_adapter/cli.py b/mneme_codex_adapter/cli.py
+index 05879da..63e813a 100644
+--- a/mneme_codex_adapter/cli.py
++++ b/mneme_codex_adapter/cli.py
+@@ -122,12 +122,14 @@ def build_parser() -> argparse.ArgumentParser:
+     doctor.add_argument("--install-root", type=Path, default=Path(DEFAULT_CODEX_INSTALL_ROOT))
+     doctor.add_argument("--base-url", default=os.environ.get("MNEME_BASE_URL", DEFAULT_CODEX_BASE_URL))
+     doctor.add_argument("--token", default=os.environ.get("MNEME_AUTH_TOKEN"))
++    doctor.add_argument("--service-label", default=DEFAULT_CODEX_SERVICE_LABEL)
+     doctor.add_argument("--timeout", type=float, default=2.0)
+ 
+     status = subcommands.add_parser("status")
+     status.add_argument("--install-root", type=Path, default=Path(DEFAULT_CODEX_INSTALL_ROOT))
+     status.add_argument("--base-url", default=os.environ.get("MNEME_BASE_URL", DEFAULT_CODEX_BASE_URL))
+     status.add_argument("--token", default=os.environ.get("MNEME_AUTH_TOKEN"))
++    status.add_argument("--service-label", default=DEFAULT_CODEX_SERVICE_LABEL)
+     status.add_argument("--timeout", type=float, default=2.0)
+ 
+     service = subcommands.add_parser("service")
+@@ -290,6 +292,7 @@ def main(argv: Sequence[str] | None = None) -> None:
+             install_root=args.install_root,
+             base_url=args.base_url,
+             token=args.token,
++            service_label=args.service_label,
+             timeout=args.timeout,
+         )
+         print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
+diff --git a/mneme_codex_adapter/hooks.py b/mneme_codex_adapter/hooks.py
+index 246eb3e..2704767 100644
+--- a/mneme_codex_adapter/hooks.py
++++ b/mneme_codex_adapter/hooks.py
+@@ -239,8 +239,8 @@ def build_codex_context_prepare_request(
+             "retrieval": {"query": query or prompt, "top_k": 8},
+             "budget_split": {
+                 "execution_state_ratio": 0.10,
+-                "retrieved_context_ratio": 0.55,
+-                "recent_tail_ratio": 0.25,
++                "retrieved_evidence_ratio": 0.55,
++                "protected_tail_ratio": 0.25,
+                 "headroom_ratio": 0.10,
+             },
+         },
+diff --git a/mneme_codex_adapter/setup.py b/mneme_codex_adapter/setup.py
+index b182f02..3fbcea2 100644
+--- a/mneme_codex_adapter/setup.py
++++ b/mneme_codex_adapter/setup.py
+@@ -211,6 +211,7 @@ def codex_desktop_status(
+     install_root: Path | None = None,
+     base_url: str = DEFAULT_CODEX_BASE_URL,
+     token: str | None = None,
++    service_label: str = DEFAULT_CODEX_SERVICE_LABEL,
+     timeout: float = 2.0,
+ ) -> dict[str, Any]:
+     root = _install_root(install_root)
+@@ -262,7 +263,7 @@ def codex_desktop_status(
+                 "mneme-codex": _entrypoint(root, "mneme-codex"),
+             },
+         },
+-        "service": codex_service_status(install_root=root, check_launchctl=False),
++        "service": codex_service_status(install_root=root, label=service_label, check_launchctl=False),
+         "provider_capabilities": _capability_summary(capabilities),
+         "files": files,
+         "token": {"present": bool(resolved_token), "source": _token_source(token, env_file)},
+diff --git a/mneme_codex_adapter/skills/mneme-memory/SKILL.md b/mneme_codex_adapter/skills/mneme-memory/SKILL.md
+index dbf40ea..3270470 100644
+--- a/mneme_codex_adapter/skills/mneme-memory/SKILL.md
++++ b/mneme_codex_adapter/skills/mneme-memory/SKILL.md
+@@ -31,25 +31,56 @@ and prior assistant reasoning.
+ MCP remains read-only in this Codex workflow. Do not invent write behavior or
+ claim that MCP replaces Codex prompt context.
+ 
++## Session Resolution Contract
++
++Before calling any Mneme read tool that accepts or requires `session_id`,
++establish the working Mneme session id first. This applies to
++`context_search`, `fetch_event`, `expand_context`, `recall_recent`,
++`list_segments`, `get_execution_state`, `get_goal_history`, `explain_context`,
++and `mneme_cost_report`.
++
++Use this order:
++
++1. If the user, current local context, a trusted hook/importer output, or a
++   prior Mneme response already supplied an exact valid `session_id`, use it.
++2. Otherwise call `mcp__mneme.resolve_session` with the current workspace
++   `project_path` and any available `thread_id`, `slug`, or task query.
++3. If resolution is missing or ambiguous, call `mcp__mneme.list_sessions` with
++   `project_path` and/or query. Prefer a single latest `ACTIVE` match whose
++   `project_id` or `metadata.cwd` exactly matches the current workspace.
++4. If multiple plausible matches remain, do not guess silently. State the
++   candidates and ask for clarification, or continue without Mneme evidence if
++   the task can proceed safely.
++
++Never infer a current session from recency alone, a repo slug, project name, or
++values like `default`. Do not call session-bound tools without `session_id` just
++to test whether a default exists. Even when using `scope: GLOBAL`, pass the
++working `session_id` as the auth/isolation anchor.
++
+ ## Recovery Workflow
+ 
+ 1. Read the local planning files.
+-2. If Mneme MCP is available, call `mcp__mneme.get_execution_state` for the
+-   relevant `session_id`.
+-3. Call `mcp__mneme.get_goal_history` when reconstructing why the current goal
++2. Establish the working `session_id` using the Session Resolution Contract.
++3. Call `mcp__mneme.get_execution_state` with the working `session_id`.
++4. Call `mcp__mneme.get_goal_history` with the working `session_id` when
++   reconstructing why the current goal
+    changed.
+-4. Call `mcp__mneme.context_search` for semantic evidence about the current
+-   question or implementation area.
+-5. Use `mcp__mneme.fetch_event` for the source event behind an important search
+-   hit.
+-6. Use `mcp__mneme.expand_context` when a fetched event depends on tool calls,
+-   decisions, or adjacent events.
+-7. Use `mcp__mneme.recall_recent` for recent-turn reconstruction.
+-8. Use `mcp__mneme.list_segments` to inspect topic boundaries in long sessions.
+-9. Use `mcp__mneme.explain_context` when you need to justify why evidence was
++5. Call `mcp__mneme.context_search` with the working `session_id` for semantic
++   evidence about the current question or implementation area. Use
++   `scope: GLOBAL` only with the working `session_id` present as anchor.
++6. Use `mcp__mneme.fetch_event` with the working `session_id` for the source
++   event behind an important search hit.
++7. Use `mcp__mneme.expand_context` with the working `session_id` when a fetched
++   event depends on tool calls, decisions, or adjacent events.
++8. Use `mcp__mneme.recall_recent` with the working `session_id` for recent-turn
++   reconstruction.
++9. Use `mcp__mneme.list_segments` with the working `session_id` to inspect
++   topic boundaries in long sessions.
++10. Use `mcp__mneme.explain_context` when you need to justify why evidence was
+    selected or dropped.
+-10. Use `mcp__mneme.mneme_cost_report` when checking provider-safe behavior,
+-   optional embeddings/reranking/enrichment cost, or dogfood health.
++11. Use `mcp__mneme.mneme_cost_report` with the working `session_id` when
++   checking provider-safe behavior, optional embeddings/reranking/enrichment
++   cost, or dogfood health.
+ 
+ ## Evidence Rules
+ 
+diff --git a/pyproject.toml b/pyproject.toml
+index 0c5f52c..8057864 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "mneme-codex-adapter"
+-version = "0.1.3"
++version = "0.1.4"
+ description = "Codex hook and transcript adapter for Mneme"
+ authors = [{ name = "Ivan Konstantinov" }]
+ readme = "README.md"
+@@ -30,6 +30,9 @@ include = ["mneme_codex_adapter*"]
+ [tool.setuptools.package-data]
+ mneme_codex_adapter = ["skills/mneme-memory/SKILL.md"]
+ 
++[tool.mneme]
++supported_core_contract = ">=0.7,<0.8"
++
+ [tool.pytest.ini_options]
+ testpaths = ["tests"]
+ pythonpath = ["."]
+diff --git a/scripts/check_core_contract_drift.py b/scripts/check_core_contract_drift.py
+new file mode 100644
+index 0000000..4d71f83
+--- /dev/null
++++ b/scripts/check_core_contract_drift.py
+@@ -0,0 +1,272 @@
++#!/usr/bin/env python
++from __future__ import annotations
++
++import argparse
++import json
++import re
++import sys
++from pathlib import Path
++import tomllib
++
++_SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
++
++
++def _as_json_schema_ref_name(schema: object) -> str | None:
++    if not isinstance(schema, dict):
++        return None
++
++    ref = schema.get("$ref")
++    if isinstance(ref, str) and ref.startswith("#/components/schemas/"):
++        return ref.rsplit("/", 1)[-1]
++    return None
++
++
++def _version_tuple(version: str) -> tuple[int, int, int] | None:
++    match = _SEMVER_RE.match(version)
++    if not match:
++        return None
++    return tuple(int(part) for part in match.groups())
++
++
++def _bound_tuple(raw: str) -> tuple[int, int, int]:
++    parts = raw.split(".")
++    if len(parts) not in {2, 3} or not all(part.isdigit() for part in parts):
++        raise ValueError(f"unsupported version bound: {raw}")
++    values = [int(part) for part in parts]
++    while len(values) < 3:
++        values.append(0)
++    return values[0], values[1], values[2]
++
++
++def _version_satisfies(version: str, range_expr: str) -> bool:
++    current = _version_tuple(version)
++    if current is None:
++        return False
++    for item in range_expr.split(","):
++        item = item.strip()
++        if not item:
++            continue
++        if item.startswith(">="):
++            if current < _bound_tuple(item.removeprefix(">=").strip()):
++                return False
++        elif item.startswith(">"):
++            if current <= _bound_tuple(item.removeprefix(">").strip()):
++                return False
++        elif item.startswith("<="):
++            if current > _bound_tuple(item.removeprefix("<=").strip()):
++                return False
++        elif item.startswith("<"):
++            if current >= _bound_tuple(item.removeprefix("<").strip()):
++                return False
++        elif item.startswith("=="):
++            if current != _bound_tuple(item.removeprefix("==").strip()):
++                return False
++        else:
++            raise ValueError(f"unsupported range clause: {item}")
++    return True
++
++
++def _adapter_supported_contract_range(path: Path) -> str:
++    data = tomllib.loads(path.read_text(encoding="utf-8"))
++    value = data.get("tool", {}).get("mneme", {}).get("supported_core_contract")
++    if not isinstance(value, str) or not value.strip():
++        raise ValueError(f"missing tool.mneme.supported_core_contract in {path}")
++    return value.strip()
++
++
++def _response_json_schema(operation: dict, status: str, errors: list[str], endpoint: str) -> object | None:
++    responses = operation.get("responses")
++    if not isinstance(responses, dict):
++        errors.append(f"{endpoint}: missing responses")
++        return None
++    response = responses.get(status)
++    if not isinstance(response, dict):
++        errors.append(f"{endpoint}: missing response {status}")
++        return None
++    content = response.get("content")
++    if not isinstance(content, dict):
++        errors.append(f"{endpoint}: missing response content")
++        return None
++    schema = content.get("application/json", {}).get("schema")
++    if not isinstance(schema, dict):
++        errors.append(f"{endpoint}: missing application/json response schema")
++        return None
++    return schema
++
++
++def _validate_schema_has_contract_version(
++    schema_name: str,
++    schemas: dict[str, object],
++    version: str,
++    errors: list[str],
++    endpoint: str,
++) -> None:
++    schema = schemas.get(schema_name)
++    if not isinstance(schema, dict):
++        errors.append(f"{endpoint}: missing schema #{schema_name}")
++        return
++
++    props = schema.get("properties")
++    if not isinstance(props, dict) or "mneme_contract_version" not in props:
++        errors.append(f"{endpoint}: {schema_name} missing mneme_contract_version")
++        return
++
++    required = schema.get("required")
++    if not isinstance(required, list) or "mneme_contract_version" not in required:
++        errors.append(f"{endpoint}: {schema_name} does not require mneme_contract_version")
++
++    prop = props["mneme_contract_version"]
++    if isinstance(prop, dict):
++        const = prop.get("const")
++        if isinstance(const, str) and const != version:
++            errors.append(
++                f"{endpoint}: {schema_name} mneme_contract_version must match info.version"
++            )
++
++
++def _validate_openapi_contract(openapi: dict, supported_range: str | None = None) -> list[str]:
++    errors: list[str] = []
++
++    info = openapi.get("info")
++    if not isinstance(info, dict):
++        errors.append("missing info")
++        return errors
++    version = info.get("version")
++    if not isinstance(version, str) or not _SEMVER_RE.match(version):
++        errors.append("info.version missing or invalid semver")
++        return errors
++    if supported_range is not None:
++        try:
++            if not _version_satisfies(version, supported_range):
++                errors.append(
++                    f"info.version {version} is outside adapter supported range {supported_range}"
++                )
++        except ValueError as exc:
++            errors.append(str(exc))
++
++    paths = openapi.get("paths")
++    if not isinstance(paths, dict):
++        errors.append("missing paths")
++        return errors
++
++    required_paths = ("/v1/health", "/v1/capabilities", "/v1/context/prepare")
++    for path in required_paths:
++        if path not in paths:
++            errors.append(f"missing required path: {path}")
++
++    components = openapi.get("components")
++    if not isinstance(components, dict):
++        errors.append("missing components")
++        return errors
++
++    schemas = components.get("schemas")
++    if not isinstance(schemas, dict):
++        errors.append("missing components.schemas")
++        return errors
++
++    health_op = paths.get("/v1/health") if isinstance(paths, dict) else None
++    if not isinstance(health_op, dict) or not isinstance(health_op.get("get"), dict):
++        if isinstance(health_op, dict):
++            errors.append("missing /v1/health GET operation")
++    else:
++        health_schema = _response_json_schema(health_op["get"], "200", errors, "/v1/health")
++        if health_schema is not None:
++            health_name = _as_json_schema_ref_name(health_schema)
++            if health_name is None:
++                errors.append("/v1/health: response schema should reference components schema")
++            else:
++                _validate_schema_has_contract_version(
++                    health_name, schemas, version, errors, "/v1/health"
++                )
++
++    capabilities_op = paths.get("/v1/capabilities") if isinstance(paths, dict) else None
++    if not isinstance(capabilities_op, dict) or not isinstance(capabilities_op.get("get"), dict):
++        if isinstance(capabilities_op, dict):
++            errors.append("missing /v1/capabilities GET operation")
++    else:
++        capabilities_schema = _response_json_schema(
++            capabilities_op["get"], "200", errors, "/v1/capabilities"
++        )
++        if capabilities_schema is not None:
++            capabilities_name = _as_json_schema_ref_name(capabilities_schema)
++            if capabilities_name is None:
++                errors.append("/v1/capabilities: response schema should reference components schema")
++            else:
++                _validate_schema_has_contract_version(
++                    capabilities_name, schemas, version, errors, "/v1/capabilities"
++                )
++
++    prepare_op = paths.get("/v1/context/prepare") if isinstance(paths, dict) else None
++    if not isinstance(prepare_op, dict) or not isinstance(prepare_op.get("post"), dict):
++        if isinstance(prepare_op, dict):
++            errors.append("missing /v1/context/prepare POST operation")
++    else:
++        req = prepare_op["post"].get("requestBody")
++        if not isinstance(req, dict):
++            errors.append("/v1/context/prepare: missing requestBody")
++        else:
++            req_content = req.get("content")
++            if not isinstance(req_content, dict) or "application/json" not in req_content:
++                errors.append("/v1/context/prepare: missing application/json request body")
++        prep_schema = _response_json_schema(prepare_op["post"], "200", errors, "/v1/context/prepare")
++        if prep_schema is not None:
++            if not _as_json_schema_ref_name(prep_schema):
++                errors.append("/v1/context/prepare: response schema should reference components schema")
++
++    return errors
++
++
++def run(path: Path, adapter_pyproject: Path | None = None) -> int:
++    if not path.exists():
++        print(f"openapi path not found: {path}", file=sys.stderr)
++        return 1
++    supported_range: str | None = None
++    if adapter_pyproject is not None:
++        try:
++            supported_range = _adapter_supported_contract_range(adapter_pyproject)
++        except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
++            print(f"cannot load adapter contract range: {exc}", file=sys.stderr)
++            return 1
++
++    try:
++        with path.open("r", encoding="utf-8") as fp:
++            openapi = json.load(fp)
++    except (OSError, json.JSONDecodeError) as exc:
++        print(f"cannot load openapi json: {exc}", file=sys.stderr)
++        return 1
++
++    errors = _validate_openapi_contract(openapi, supported_range=supported_range)
++    if errors:
++        for error in errors:
++            print(f"{error}")
++        print(f"FAIL: contract drift check found {len(errors)} issue(s)")
++        return 1
++
++    print("PASS: core contract drift check")
++    return 0
++
++
++def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
++    parser = argparse.ArgumentParser(
++        description="Validate Core openapi contract fixture for adapter-facing endpoints."
++    )
++    parser.add_argument(
++        "--openapi",
++        required=True,
++        help="Path to Core openapi.json fixture.",
++    )
++    parser.add_argument(
++        "--adapter-pyproject",
++        default=str(Path(__file__).resolve().parents[1] / "pyproject.toml"),
++        help="Path to adapter pyproject.toml with tool.mneme.supported_core_contract.",
++    )
++    return parser.parse_args(argv)
++
++
++def main(argv: list[str] | None = None) -> int:
++    args = parse_args(argv)
++    return run(Path(args.openapi), adapter_pyproject=Path(args.adapter_pyproject))
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/scripts/check_no_core_internal_imports.py b/scripts/check_no_core_internal_imports.py
+new file mode 100644
+index 0000000..5e09021
+--- /dev/null
++++ b/scripts/check_no_core_internal_imports.py
+@@ -0,0 +1,97 @@
++#!/usr/bin/env python
++from __future__ import annotations
++
++import argparse
++import ast
++import sys
++from collections.abc import Iterable
++from pathlib import Path
++
++
++class _ViolationCollector(ast.NodeVisitor):
++    def __init__(self, path: Path) -> None:
++        self.path = path
++        self.violations: list[tuple[int, str]] = []
++
++    def visit_Import(self, node: ast.Import) -> None:
++        for alias in node.names:
++            if alias.name == "mneme_service" or alias.name.startswith("mneme_service."):
++                self.violations.append((node.lineno, alias.name))
++        self.generic_visit(node)
++
++    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
++        if node.level == 0 and node.module and (
++            node.module == "mneme_service" or node.module.startswith("mneme_service.")
++        ):
++            self.violations.append((node.lineno, node.module))
++        self.generic_visit(node)
++
++
++def _iter_python_files(root: Path, include_tests: bool) -> Iterable[Path]:
++    package_dir = root / "mneme_codex_adapter"
++    search_roots = [package_dir] if package_dir.exists() else [root]
++
++    for base in search_roots:
++        for path in base.rglob("*.py"):
++            if path.name == "__pycache__":
++                continue
++            if not include_tests and "tests" in path.parts:
++                continue
++            yield path
++
++
++def _find_violations(root: Path, include_tests: bool = False) -> list[tuple[Path, int, str]]:
++    results: list[tuple[Path, int, str]] = []
++    for path in _iter_python_files(root, include_tests):
++        try:
++            source = path.read_text(encoding="utf-8")
++            tree = ast.parse(source)
++        except (SyntaxError, UnicodeDecodeError) as exc:
++            results.append((path, 0, f"Cannot parse file: {exc}"))
++            continue
++
++        collector = _ViolationCollector(path)
++        collector.visit(tree)
++        results.extend((path, lineno, module) for lineno, module in collector.violations)
++
++    return results
++
++
++def run(root: Path, include_tests: bool = False) -> int:
++    violations = _find_violations(root, include_tests=include_tests)
++    if not violations:
++        return 0
++
++    for path, lineno, module in violations:
++        location = f"{path}:{lineno}" if lineno else str(path)
++        print(f"{location}: import of '{module}' from Core daemon internals is forbidden")
++    print(
++        f"FAIL: found {len(violations)} forbidden import(s) from mneme_service in adapter source"
++    )
++    return 1
++
++
++def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
++    parser = argparse.ArgumentParser(
++        description="Fail if adapter source imports mneme_service internals."
++    )
++    parser.add_argument(
++        "--path",
++        default=str(Path(__file__).resolve().parents[1]),
++        help="Repository root to scan (default: current repo).",
++    )
++    parser.add_argument(
++        "--include-tests",
++        action="store_true",
++        help="Include tests/** files in scanning.",
++    )
++    return parser.parse_args(argv)
++
++
++def main(argv: list[str] | None = None) -> int:
++    args = parse_args(argv)
++    return run(Path(args.path).resolve(), include_tests=args.include_tests)
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tests/test_codex_ingest.py b/tests/test_codex_ingest.py
+index 17b8243..90d89b8 100644
+--- a/tests/test_codex_ingest.py
++++ b/tests/test_codex_ingest.py
+@@ -70,6 +70,7 @@ def test_codex_transcript_normalizes_to_session_events_and_turn_payloads() -> No
+ 
+     assert len(payloads.turns) == 1
+     assert payloads.turns[0]["schema_version"] == "mneme.turn.v0"
++    assert payloads.turns[0]["status"] == "COMPLETED"
+     assert payloads.turns[0]["event_ids"] == [event["event_id"] for event in events]
+     assert payloads.turns[0]["usage"]["tool_call_count"] == 1
+ 
+@@ -90,7 +91,7 @@ def test_codex_transcript_imports_through_rest_and_replay_is_idempotent(tmp_path
+         assert first["session"]["created"] is True
+         assert first["events"]["accepted"] == 3
+         assert first["events"]["duplicates"] == 0
+-        assert first["turns"][0]["status"] == "RECORDED"
++        assert first["turns"][0]["status"] == "COMPLETED"
+ 
+         second = await import_codex_transcript(
+             sample_transcript(),
+diff --git a/tests/test_contract_checks.py b/tests/test_contract_checks.py
+new file mode 100644
+index 0000000..544a819
+--- /dev/null
++++ b/tests/test_contract_checks.py
+@@ -0,0 +1,272 @@
++from __future__ import annotations
++
++import json
++import subprocess
++import sys
++from pathlib import Path
++
++
++def _repo_root() -> Path:
++    return Path(__file__).resolve().parents[1]
++
++
++def _script(path: str) -> list[str]:
++    return [str(sys.executable), str(_repo_root() / "scripts" / path)]
++
++
++def test_check_no_core_internal_imports_passes_within_clean_adapter(tmp_path: Path) -> None:
++    package_dir = tmp_path / "mneme_codex_adapter"
++    package_dir.mkdir()
++    (package_dir / "__init__.py").write_text("\n", encoding="utf-8")
++    (package_dir / "clean.py").write_text("import os\n", encoding="utf-8")
++
++    result = subprocess.run(
++        _script("check_no_core_internal_imports.py") + ["--path", str(tmp_path)],
++        capture_output=True,
++        text=True,
++    )
++
++    assert result.returncode == 0
++    assert "FAIL" not in result.stdout
++
++
++def test_check_no_core_internal_imports_blocks_core_import_outside_tests(tmp_path: Path) -> None:
++    package_dir = tmp_path / "mneme_codex_adapter"
++    package_dir.mkdir()
++    (package_dir / "bad.py").write_text("from mneme_service.app import create_app\n", encoding="utf-8")
++
++    result = subprocess.run(
++        _script("check_no_core_internal_imports.py") + ["--path", str(tmp_path)],
++        capture_output=True,
++        text=True,
++    )
++
++    assert result.returncode != 0
++    assert "mneme_service" in result.stdout
++
++
++def test_check_no_core_internal_imports_ignores_tests_by_default(tmp_path: Path) -> None:
++    package_dir = tmp_path / "mneme_codex_adapter"
++    package_dir.mkdir()
++    (package_dir / "__init__.py").write_text("\n", encoding="utf-8")
++    tests_dir = tmp_path / "tests"
++    tests_dir.mkdir()
++    (tests_dir / "test_bad.py").write_text("from mneme_service.app import create_app\n", encoding="utf-8")
++
++    result = subprocess.run(
++        _script("check_no_core_internal_imports.py") + ["--path", str(tmp_path)],
++        capture_output=True,
++        text=True,
++    )
++
++    assert result.returncode == 0
++    assert "FAIL" not in result.stdout
++
++
++def test_check_core_contract_drift_valid_openapi(tmp_path: Path) -> None:
++    openapi = {
++        "openapi": "3.1.0",
++        "info": {"title": "mneme", "version": "0.7.5"},
++        "paths": {
++            "/v1/health": {
++                "get": {
++                    "responses": {
++                        "200": {
++                            "content": {
++                                "application/json": {
++                                    "schema": {
++                                        "$ref": "#/components/schemas/HealthResponse"
++                                    }
++                                }
++                            }
++                        }
++                    }
++                }
++            },
++            "/v1/capabilities": {
++                "get": {
++                    "responses": {
++                        "200": {
++                            "content": {
++                                "application/json": {
++                                    "schema": {
++                                        "$ref": "#/components/schemas/CapabilitiesResponse"
++                                    }
++                                }
++                            }
++                        }
++                    }
++                }
++            },
++            "/v1/context/prepare": {
++                "post": {
++                    "requestBody": {
++                        "content": {
++                            "application/json": {
++                                "schema": {
++                                    "$ref": "#/components/schemas/ContextPrepareRequest"
++                                }
++                            }
++                        }
++                    },
++                    "responses": {
++                        "200": {
++                            "content": {
++                                "application/json": {
++                                    "schema": {
++                                        "$ref": "#/components/schemas/ContextPrepareResponse"
++                                    }
++                                }
++                            }
++                        }
++                    },
++                }
++            },
++        },
++        "components": {
++            "schemas": {
++                "HealthResponse": {
++                    "type": "object",
++                    "required": ["mneme_contract_version"],
++                    "properties": {
++                        "mneme_contract_version": {
++                            "type": "string"
++                        }
++                    },
++                },
++                "CapabilitiesResponse": {
++                    "type": "object",
++                    "required": ["mneme_contract_version"],
++                    "properties": {
++                        "mneme_contract_version": {
++                            "type": "string"
++                        }
++                    },
++                },
++                "ContextPrepareRequest": {"type": "object"},
++                "ContextPrepareResponse": {"type": "object"},
++            }
++        },
++    }
++
++    openapi_path = tmp_path / "openapi.json"
++    openapi_path.write_text(json.dumps(openapi), encoding="utf-8")
++    pyproject_path = tmp_path / "pyproject.toml"
++    pyproject_path.write_text(
++        '[tool.mneme]\nsupported_core_contract = ">=0.7,<0.8"\n',
++        encoding="utf-8",
++    )
++
++    result = subprocess.run(
++        _script("check_core_contract_drift.py")
++        + ["--openapi", str(openapi_path), "--adapter-pyproject", str(pyproject_path)],
++        capture_output=True,
++        text=True,
++    )
++
++    assert result.returncode == 0
++    assert "PASS" in result.stdout
++
++
++def test_check_core_contract_drift_fails_when_contract_range_mismatches(tmp_path: Path) -> None:
++    openapi = {
++        "openapi": "3.1.0",
++        "info": {"title": "mneme", "version": "0.8.0"},
++        "paths": {
++            "/v1/health": {
++                "get": {
++                    "responses": {
++                        "200": {
++                            "content": {
++                                "application/json": {
++                                    "schema": {"$ref": "#/components/schemas/HealthResponse"}
++                                }
++                            }
++                        }
++                    }
++                }
++            },
++            "/v1/capabilities": {
++                "get": {
++                    "responses": {
++                        "200": {
++                            "content": {
++                                "application/json": {
++                                    "schema": {"$ref": "#/components/schemas/CapabilitiesResponse"}
++                                }
++                            }
++                        }
++                    }
++                }
++            },
++            "/v1/context/prepare": {
++                "post": {
++                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
++                    "responses": {
++                        "200": {
++                            "content": {
++                                "application/json": {
++                                    "schema": {"$ref": "#/components/schemas/ContextPrepareResponse"}
++                                }
++                            }
++                        }
++                    },
++                }
++            },
++        },
++        "components": {
++            "schemas": {
++                "HealthResponse": {
++                    "required": ["mneme_contract_version"],
++                    "properties": {"mneme_contract_version": {"type": "string"}},
++                },
++                "CapabilitiesResponse": {
++                    "required": ["mneme_contract_version"],
++                    "properties": {"mneme_contract_version": {"type": "string"}},
++                },
++                "ContextPrepareResponse": {"type": "object"},
++            }
++        },
++    }
++    openapi_path = tmp_path / "openapi.json"
++    openapi_path.write_text(json.dumps(openapi), encoding="utf-8")
++    pyproject_path = tmp_path / "pyproject.toml"
++    pyproject_path.write_text(
++        '[tool.mneme]\nsupported_core_contract = ">=0.7,<0.8"\n',
++        encoding="utf-8",
++    )
++
++    result = subprocess.run(
++        _script("check_core_contract_drift.py")
++        + ["--openapi", str(openapi_path), "--adapter-pyproject", str(pyproject_path)],
++        capture_output=True,
++        text=True,
++    )
++
++    assert result.returncode != 0
++    assert "outside adapter supported range" in result.stdout
++
++
++def test_check_core_contract_drift_fails_when_fields_are_stale(tmp_path: Path) -> None:
++    openapi_path = tmp_path / "openapi.json"
++    openapi_path.write_text(
++        json.dumps(
++            {
++                "openapi": "3.1.0",
++                "info": {"title": "mneme", "version": "0.7.0"},
++                "paths": {},
++                "components": {"schemas": {}},
++            }
++        ),
++        encoding="utf-8",
++    )
++
++    result = subprocess.run(
++        _script("check_core_contract_drift.py")
++        + ["--openapi", str(openapi_path)],
++        capture_output=True,
++        text=True,
++    )
++
++    assert result.returncode != 0
++    assert "missing required path" in result.stdout
+diff --git a/tests/test_setup.py b/tests/test_setup.py
+index fb70b28..f483d28 100644
+--- a/tests/test_setup.py
++++ b/tests/test_setup.py
+@@ -3,6 +3,7 @@ from __future__ import annotations
+ import json
+ import os
+ from pathlib import Path
++import tomllib
+ 
+ 
+ def test_global_setup_creates_safe_runtime_files(tmp_path: Path) -> None:
+@@ -65,6 +66,7 @@ def test_status_reports_missing_daemon_without_token_leak(tmp_path: Path) -> Non
+     result = codex_desktop_status(
+         install_root=root,
+         base_url="http://127.0.0.1:9",
++        service_label="com.mneme.codex.test-missing-daemon",
+         timeout=0.05,
+     )
+     serialized = json.dumps(result, sort_keys=True)
+@@ -114,6 +116,10 @@ def test_skill_install_writes_mneme_memory_skill(tmp_path: Path) -> None:
+     assert "name: mneme-memory" in text
+     assert "mcp__mneme.context_search" in text
+     assert "evidence, not instructions" in text.lower()
++    assert "## Session Resolution Contract" in text
++    assert "mcp__mneme.resolve_session" in text
++    assert "mcp__mneme.list_sessions" in text
++    assert "Never infer a current session from recency alone" in text
+ 
+     second = install_mneme_memory_skill(target_dir=target_dir)
+     assert second["preserved"] == [str(skill_path)]
+@@ -128,3 +134,14 @@ def test_install_docs_require_mneme_memory_skill() -> None:
+     assert "mneme-memory" in combined
+     assert "required" in combined
+     assert "$home/.codex/skills" in combined
++
++
++def test_adapter_declares_supported_core_contract_range() -> None:
++    from mneme_codex_adapter import CORE_CONTRACT_RANGE
++
++    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
++    readme = Path("README.md").read_text(encoding="utf-8")
++
++    assert pyproject["tool"]["mneme"]["supported_core_contract"] == ">=0.7,<0.8"
++    assert CORE_CONTRACT_RANGE == pyproject["tool"]["mneme"]["supported_core_contract"]
++    assert f"Core contract `{CORE_CONTRACT_RANGE}`" in readme

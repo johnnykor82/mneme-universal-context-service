@@ -1,0 +1,49 @@
+{
+  "version": "1",
+  "denylist": [
+    "codex",
+    "hermes",
+    "cursor",
+    "openai_agents",
+    "claude_code",
+    "langgraph"
+  ],
+  "allowlist": [
+    "README.md",
+    "docs/INSTALLATION.md",
+    "docs/MNEME_HOST_ADAPTER_CONTRACT_V0.md",
+    "docs/MNEME_CORE_ADAPTER_BOUNDARY_REFACTOR_SPEC.md",
+    "docs/PUBLICATION_CHECKLIST.md",
+    "docs/reviews/core_adapter_dependency_audit.md",
+    "docs/reviews/core_adapter_test_coverage_mapping.md",
+    "tests/test_core_adapter_boundary.py",
+    "tests/test_release_docs.py"
+  ],
+  "exemptions": [
+    {
+      "pattern": "^docs/MNEME_CORE_ADAPTER_BOUNDARY_REFACTOR_SPEC\\.md$",
+      "reason": "Approved boundary specification describes the host split and denylist terms.",
+      "scope": "documentation"
+    },
+    {
+      "pattern": "^docs/PUBLICATION_CHECKLIST\\.md$",
+      "reason": "Publication checklist records historical split gates and public adapter repository names.",
+      "scope": "documentation"
+    },
+    {
+      "pattern": "^docs/reviews/",
+      "reason": "Reviewer evidence records removed host-adapter artifacts for traceability.",
+      "scope": "reviewer-evidence"
+    },
+    {
+      "pattern": "^tests/test_core_adapter_boundary\\.py$",
+      "reason": "Boundary tests must name forbidden host artifacts to prevent recurrence.",
+      "scope": "tests"
+    },
+    {
+      "pattern": "^tests/test_release_docs\\.py$",
+      "reason": "Release-doc tests assert allowed adapter repository pointers and overclaim guards.",
+      "scope": "tests"
+    }
+  ]
+}

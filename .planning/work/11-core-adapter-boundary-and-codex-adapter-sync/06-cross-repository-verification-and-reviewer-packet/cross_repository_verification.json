@@ -1,0 +1,143 @@
+{
+  "adapter": {
+    "base_commit": "2a7628631198d0938d52e05fb69a916ad604bcf4",
+    "patch_evidence": ".planning/work/11-core-adapter-boundary-and-codex-adapter-sync/02-codex-adapter-sync-first/mneme-codex-adapter-sync.patch",
+    "published_commit": "bd69b15e5716bb7731256aeba85ae45963be399a",
+    "publication_note": "Patch evidence was committed and pushed to GitHub main after post-completion skill/hook hardening.",
+    "remote": "https://github.com/johnnykor82/mneme-codex-adapter.git",
+    "repository": "<adapter-checkout>",
+    "supported_core_contract_range": ">=0.7,<0.8",
+    "version": "0.1.4",
+    "worktree": "verified as a dirty local Phase 11 patch, then committed and pushed as bd69b15e5716bb7731256aeba85ae45963be399a"
+  },
+  "core": {
+    "artifact_sdist": "<tmp>/mneme-core-dist-task06/mneme_context_service-0.1.0.tar.gz",
+    "artifact_sdist_sha256": "7bd22e4e81b66a8ca2d956580874d53ae8644298f1a0556e4a8f165636ed985e",
+    "artifact_wheel": "<tmp>/mneme-core-dist-task06/mneme_context_service-0.1.0-py3-none-any.whl",
+    "artifact_wheel_sha256": "f199bcb36f3c31ba80845959871d0b134be751c16f7071ab5fc32bfed99e8a50",
+    "base_commit": "40a6699057d802e4381a6847fa694b7104124294",
+    "contract_version": "0.7.5",
+    "openapi_fixture": "<tmp>/mneme-openapi-task06/openapi.json",
+    "repository": ".",
+    "worktree": "dirty working tree containing Phase 11 Task 01-06 changes"
+  },
+  "installed_package_identity": {
+    "adapter_core_contract_range": ">=0.7,<0.8",
+    "core_contract_version": "0.7.5",
+    "mneme_codex_adapter_file": "<adapter-checkout>/mneme_codex_adapter/__init__.py",
+    "mneme_service_file": "<adapter-verify-venv>/lib/python3.13/site-packages/mneme_service/__init__.py"
+  },
+  "pip_freeze": [
+    "annotated-doc==0.0.4",
+    "annotated-types==0.7.0",
+    "anyio==4.14.1",
+    "attrs==26.1.0",
+    "certifi==2026.6.17",
+    "cffi==2.0.0",
+    "click==8.4.2",
+    "cryptography==49.0.0",
+    "fastapi==0.138.1",
+    "h11==0.16.0",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "httpx-sse==0.4.3",
+    "idna==3.18",
+    "iniconfig==2.3.0",
+    "jsonschema==4.26.0",
+    "jsonschema-specifications==2025.9.1",
+    "mcp==1.28.1",
+    "-e git+https://github.com/johnnykor82/mneme-codex-adapter.git@2a7628631198d0938d52e05fb69a916ad604bcf4#egg=mneme_codex_adapter",
+    "mneme-context-service @ file://<tmp>/mneme-core-dist-task06/mneme_context_service-0.1.0-py3-none-any.whl#sha256=f199bcb36f3c31ba80845959871d0b134be751c16f7071ab5fc32bfed99e8a50",
+    "packaging==26.2",
+    "pluggy==1.6.0",
+    "pycparser==3.0",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.2",
+    "pydantic_core==2.46.4",
+    "Pygments==2.20.0",
+    "PyJWT==2.13.0",
+    "pytest==9.1.1",
+    "python-dotenv==1.2.2",
+    "python-multipart==0.0.32",
+    "referencing==0.37.0",
+    "rpds-py==2026.5.1",
+    "setuptools==82.0.1",
+    "sse-starlette==3.4.5",
+    "starlette==1.3.1",
+    "typing-inspection==0.4.2",
+    "typing_extensions==4.15.0",
+    "uvicorn==0.49.0"
+  ],
+  "result": "pass",
+  "rollback_gate": "No rollback invoked; all Task 06 artifact, adapter, and runtime smoke checks passed. Adapter publication completed after post-completion skill/hook hardening.",
+  "runtime_smoke": {
+    "adapter_status_token_safe": true,
+    "checks": {
+      "capabilities_contract_version": "0.7.5",
+      "fetch_event_id": "codex-phase11-runtime-smoke-1782550735-turn-1-0001",
+      "first_ingest": {
+        "accepted": 3,
+        "created": true,
+        "duplicates": 0
+      },
+      "health": "OK",
+      "replay_ingest": {
+        "accepted": 0,
+        "created": false,
+        "duplicates": 3
+      },
+      "search_result_count": 4
+    },
+    "core_contract_version": "0.7.5",
+    "redaction_verified": true,
+    "result": "pass",
+    "schema_version": "mneme.phase11.runtime_smoke.v0",
+    "session_id": "phase11-runtime-smoke-1782550735"
+  },
+  "schema_version": "mneme.phase11.cross_repository_verification.v0",
+  "verification_commands": [
+    {
+      "command": "<adapter-verify-venv>/bin/python -m pip install --force-reinstall --no-deps <tmp>/mneme-core-dist-task06/mneme_context_service-0.1.0-py3-none-any.whl",
+      "name": "install fresh Core wheel",
+      "result": "pass"
+    },
+    {
+      "command": "<adapter-verify-venv>/bin/python -m pip install -e <adapter-checkout> --no-deps --no-build-isolation",
+      "name": "install adapter checkout",
+      "note": "build isolation was disabled because network installation of build dependencies is unavailable in this local environment",
+      "result": "pass"
+    },
+    {
+      "command": "env TMPDIR=<tmp> <adapter-verify-venv>/bin/python -m pytest -q",
+      "name": "adapter pytest",
+      "result": "40 passed"
+    },
+    {
+      "command": "env TMPDIR=<tmp> <adapter-verify-venv>/bin/python -m compileall -q mneme_codex_adapter tests scripts",
+      "name": "adapter compileall",
+      "result": "pass"
+    },
+    {
+      "command": "<adapter-verify-venv>/bin/python scripts/check_no_core_internal_imports.py",
+      "name": "adapter import boundary",
+      "result": "pass"
+    },
+    {
+      "command": "<adapter-verify-venv>/bin/python scripts/check_core_contract_drift.py --openapi <tmp>/mneme-openapi-task06/openapi.json",
+      "name": "adapter contract drift",
+      "result": "PASS: core contract drift check"
+    },
+    {
+      "command": "git diff --check",
+      "name": "adapter diff hygiene",
+      "result": "pass"
+    },
+    {
+      "command": "<adapter-verify-venv>/bin/python <inline smoke script>",
+      "evidence": "runtime_smoke.json",
+      "name": "combined runtime smoke",
+      "result": "pass"
+    }
+  ],
+  "verification_started_at": "2026-06-27T08:59:55+00:00"
+}

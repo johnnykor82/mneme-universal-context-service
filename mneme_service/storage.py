@@ -29,7 +29,6 @@ SESSION_DISCOVERY_METADATA_KEYS = (
     "cwd",
     "thread_id",
     "source",
-    "codex_hook_source",
     "transcript_path",
 )
 

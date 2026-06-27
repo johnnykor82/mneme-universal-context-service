@@ -2648,3 +2648,248 @@
 - Updated `docs/MNEME_V0_COMPLIANCE_MATRIX.md` to final counts:
   `COMPLIANT: 64`, `PARTIAL: 0`, `MISSING: 0`, `OUT_OF_SCOPE/FUTURE: 1`.
 - Marked Phase 10 and the top-level roadmap complete. Commit/push/release publication and external owner sign-off remain separate explicit actions.
+
+## 2026-06-27 - Phase 11 Core/Adapter Boundary Planning Created
+
+- Promoted `docs/MNEME_CORE_ADAPTER_BOUNDARY_REFACTOR_SPEC.md` from reviewed
+  v0.5 draft to `Approved for spec-driven planning` after user accepted it as
+  the ready specification.
+- Added the approved extension scope to `.planning/spec.md`, including the
+  extension Spec Format Assessment and mapping approach.
+- Added Phase 11 to `.planning/roadmap.md`:
+  `11-core-adapter-boundary-and-codex-adapter-sync`.
+- Created Phase 11 plan and six detailed task plans:
+  `01-boundary-spec-amendment-and-contract-version`,
+  `02-codex-adapter-sync-first`,
+  `03-dependency-extraction-audit`,
+  `04-core-cleanup-and-coverage-preservation`,
+  `05-boundary-ci-and-publication-hygiene`, and
+  `06-cross-repository-verification-and-reviewer-packet`.
+- Extension Planning Gate status is `NOT CLEARED`; implementation has not
+  started and must wait for explicit user approval.
+
+## 2026-06-27 - Phase 11 Task 01 Complete
+
+- Cleared the Phase 11 Extension Planning Gate after explicit user approval.
+- Added `docs/MNEME_CONTRACT_VERSION` with contract version `0.7.5`.
+- Added `mneme_service/version.py` to separate package `service_version`
+  (`0.1.0`) from public `mneme_contract_version` (`0.7.5`).
+- Wired `mneme_contract_version` into OpenAPI `info.version`, `/v1/health`,
+  and `/v1/capabilities`.
+- Added `docs/MNEME_HOST_ADAPTER_CONTRACT_V0.md` and tightened README
+  integration-depth language so Core remains host-neutral and adapters own host
+  lifecycle behavior.
+- Verification:
+  - RED before implementation:
+    `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_openapi.py::test_contract_version_is_canonical_across_docs_openapi_and_runtime -q`
+    -> failed with missing `docs/MNEME_CONTRACT_VERSION`.
+  - Focused GREEN:
+    same command -> `1 passed, 1 warning`.
+  - OpenAPI suite:
+    `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_openapi.py -q`
+    -> `11 passed, 1 warning`.
+  - Docs boundary gate:
+    `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_codex_adapter.py::test_readme_core_release_does_not_present_codex_adapter_docs_or_commands -q`
+    -> `1 passed`.
+  - Endpoint touched gate:
+    `env TMPDIR=/private/tmp .venv/bin/python -m pytest tests/test_contract.py::test_auth_health_capabilities_and_session_idempotency tests/test_config.py::test_capabilities_reflect_provider_configuration_without_leaking_secrets -q`
+    -> `2 passed, 1 warning`.
+  - Compileall and `git diff --check` -> exit 0.
+- Advanced Phase 11 Active Task to `02-codex-adapter-sync-first`.
+
+## 2026-06-27 - Phase 11 Task 02 Adapter Sync Complete Locally
+
+- Cloned the standalone adapter repository from
+  `https://github.com/johnnykor82/mneme-codex-adapter.git` to
+  `/private/tmp/mneme-codex-adapter-phase11` and created local branch
+  `codex/phase11-adapter-sync` from base commit
+  `2a7628631198d0938d52e05fb69a916ad604bcf4`.
+- Reproduced the three known adapter failures against current Core behavior:
+  transcript turn status expected `RECORDED` but Core returns `COMPLETED`,
+  context preview used stale `budget_split` keys, and status tests could collide
+  with an existing user LaunchAgent plist.
+- Updated the adapter patch to use canonical context-prepare budget keys,
+  expect `COMPLETED`, make status checks label-configurable, declare supported
+  Core contract range `>=0.7,<0.8`, add AST import-boundary and OpenAPI
+  contract-drift checks, and wire the import-boundary check into adapter CI.
+- Built current Core working tree artifact:
+  `/private/tmp/mneme-core-dist-phase11/mneme_context_service-0.1.0-py3-none-any.whl`,
+  sha256 `20c5ea772459b0d44689bf140bd8cf1ef0888720a0d7a50b0087b61a557fbb94`.
+- Isolated adapter verification used
+  `/private/tmp/mneme-adapter-verify-venv-phase11`; Core imported from the
+  installed wheel in site-packages with contract version `0.7.5`.
+- Verification:
+  - Adapter contract checks: `6 passed`.
+  - Contract drift check against generated Core OpenAPI:
+    `PASS: core contract drift check`.
+  - Import-boundary script: exit 0.
+  - Isolated adapter suite: `40 passed`.
+  - Isolated compileall and adapter `git diff --check`: exit 0.
+- Saved durable evidence:
+  - `verification.json`
+  - `mneme-codex-adapter-sync.patch`
+- Publication gate remained pending at this point: adapter patch was not
+  committed or pushed because commit/push required separate explicit user
+  permission. Superseded later by adapter commit
+  `bd69b15e5716bb7731256aeba85ae45963be399a`.
+- Advanced Phase 11 Active Task to `03-dependency-extraction-audit`.
+
+## 2026-06-27 - Phase 11 Task 03 Dependency Extraction Audit Complete
+
+- Created `docs/reviews/core_adapter_dependency_audit.md`.
+- Audited Core-side Codex implementation modules:
+  `mneme_service/codex_ingest.py`, `mneme_service/codex_hooks.py`, and
+  `mneme_service/codex_setup.py`.
+- Audited Core CLI Codex command imports/parser wiring/dispatch,
+  `adapters/codex/`, `.agents/skills/mneme-memory/SKILL.md`, and
+  Core Codex-specific tests.
+- Audit decision: Codex implementation, docs, examples, setup/service helpers,
+  skill, and tests are adapter-owned; Core should retain only public REST/MCP
+  contracts, generic docs, and short adapter repository pointers.
+- No hidden generic behavior was found that requires a new `mneme-client` or
+  `mneme-schemas` package before cleanup.
+- Verification: `git diff --check` -> exit 0.
+- Advanced Phase 11 Active Task to `04-core-cleanup-and-coverage-preservation`.
+## 2026-06-27 - Phase 11 Task 04 Core Cleanup Complete
+
+- Removed Core-owned Codex implementation surface from the active Core tree:
+  `mneme_service/codex_*.py`, `adapters/codex/`, `.agents/skills/mneme-memory/`,
+  Core Codex CLI commands, and Core Codex-specific tests.
+- Added/preserved generic replacement coverage:
+  `tests/test_core_adapter_boundary.py`, `tests/test_boundary_scripts.py`,
+  `tests/test_release_docs.py`, and
+  `docs/reviews/core_adapter_test_coverage_mapping.md`.
+- Added local boundary/publication guard scripts and policies:
+  `scripts/check_core_boundary.py`, `scripts/check_distribution_boundary.py`,
+  `scripts/check_contract_version.py`, `scripts/check_publication_hygiene.py`,
+  `scripts/host_boundary_policy.json`, and
+  `scripts/publication_hygiene_allowlist.json`.
+- Fixed false positives in the guards: SQLite `cursor` is not treated as a
+  Cursor host adapter, placeholder secrets are not treated as leaks, and test
+  fake secrets are allowlisted in source and sdist evidence.
+- Verification:
+  - Focused boundary/script tests: `12 passed, 1 warning`.
+  - Full Core suite: `306 passed, 1 warning`.
+  - Compileall for `mneme_service`, `tests`, and `scripts`: exit 0.
+  - Clean wheel/sdist build via `setuptools.build_meta`: succeeded after
+    removing generated stale `build/` cache.
+  - `scripts/check_core_boundary.py`: passed.
+  - `scripts/check_distribution_boundary.py <artifacts>`: passed.
+  - `scripts/check_contract_version.py`: passed.
+  - `scripts/check_publication_hygiene.py <artifacts>`: passed.
+  - `git diff --check`: exit 0.
+- Advanced Phase 11 Active Task to `05-boundary-ci-and-publication-hygiene`.
+
+## 2026-06-27 - Phase 11 Task 05 Boundary CI And Publication Hygiene Complete
+
+- Spark delegation was attempted for a read-only Task 05 audit, but the
+  `gpt-5.3-codex-spark` limit was exhausted; the parent session completed the
+  task.
+- Finalized Core guard scripts and policies:
+  `scripts/check_core_boundary.py`, `scripts/check_distribution_boundary.py`,
+  `scripts/check_contract_version.py`, `scripts/check_publication_hygiene.py`,
+  `scripts/host_boundary_policy.json`, and
+  `scripts/publication_hygiene_allowlist.json`.
+- Tightened guard behavior:
+  - `host_boundary_policy.json` now stays on the approved schema without
+    non-spec keys.
+  - distribution boundary reads the shared policy denylist and has fixture
+    coverage for future host names.
+  - contract-version check uses a temporary DB outside the repository.
+  - publication hygiene allowlist covers test fake secrets in source and sdist
+    paths without suppressing production findings.
+- Wired Core CI to install `build`, run full tests, parity acceptance,
+  compile `mneme_service`, `tests`, and `scripts`, build wheel/sdist, and run
+  boundary/distribution/contract-version/publication-hygiene checks.
+- Updated the standalone adapter patch evidence so adapter CI includes both
+  AST import-boundary and Core OpenAPI contract-drift checks.
+- Verification:
+  - Focused Core boundary/script tests: `13 passed, 1 warning`.
+  - Core guard scripts against fresh temporary artifacts: all passed.
+  - Adapter import-boundary and contract-drift checks: passed.
+  - Core compileall: exit 0.
+  - Full Core suite: `307 passed, 1 warning`.
+  - Core and adapter `git diff --check`: exit 0.
+- Advanced Phase 11 Active Task to
+  `06-cross-repository-verification-and-reviewer-packet`.
+
+## 2026-06-27 - Phase 11 Task 06 And Phase Complete
+
+- Built fresh Core artifacts for final cross-repository verification:
+  - wheel SHA-256:
+    `f199bcb36f3c31ba80845959871d0b134be751c16f7071ab5fc32bfed99e8a50`
+  - sdist SHA-256:
+    `7bd22e4e81b66a8ca2d956580874d53ae8644298f1a0556e4a8f165636ed985e`
+- Force-reinstalled the fresh Core wheel into the adapter verification
+  environment and reinstalled the adapter checkout without build isolation
+  because network dependency installation is unavailable locally.
+- Cross-repository adapter verification passed:
+  - installed Core imported from site-packages, not the Core source checkout;
+  - adapter pytest: `40 passed`;
+  - adapter compileall: exit 0;
+  - adapter AST import-boundary: exit 0;
+  - adapter contract-drift against fresh Core OpenAPI: passed;
+  - adapter `git diff --check`: exit 0.
+- Combined runtime smoke passed with a clean temporary DB/state:
+  health/capabilities contract version `0.7.5`, adapter transcript ingest,
+  idempotent replay, `context_search`, `fetch_event`, token-safe adapter
+  status, and fake-secret redaction.
+- Core final verification passed:
+  - full suite: `307 passed, 1 warning`;
+  - OpenAPI suite: `11 passed, 1 warning`;
+  - compileall: exit 0;
+  - boundary/distribution/contract-version/publication-hygiene checks: passed;
+  - Core `git diff --check`: exit 0.
+- Created reviewer packet:
+  `docs/MNEME_CORE_ADAPTER_BOUNDARY_REVIEWER_PACKET.md`.
+- Created evidence artifacts:
+  `cross_repository_verification.json` and `runtime_smoke.json`.
+- Marked Phase 11 complete and set roadmap `Active Phase: none`.
+- Commit/push for Core and adapter repositories remains a separate explicit
+  owner action.
+
+## 2026-06-27 - Phase 11 Pre-Commit Skill And Hook Hardening
+
+- Found one pre-commit gap after the user asked whether Core, adapter, skill,
+  and hooks were all complete: the installed global `mneme-memory` skill had
+  the new Session Resolution Contract, but the adapter-packaged skill copies
+  did not.
+- Added a RED/GREEN adapter test assertion to
+  `tests/test_setup.py::test_skill_install_writes_mneme_memory_skill` requiring
+  `## Session Resolution Contract`, `mcp__mneme.resolve_session`,
+  `mcp__mneme.list_sessions`, and the no-recency-guess rule.
+- Updated both adapter-owned skill copies:
+  `mneme_codex_adapter/skills/mneme-memory/SKILL.md` and
+  `.agents/skills/mneme-memory/SKILL.md`.
+- Regenerated the Core planning patch evidence:
+  `.planning/work/11-core-adapter-boundary-and-codex-adapter-sync/02-codex-adapter-sync-first/mneme-codex-adapter-sync.patch`.
+- Verification:
+  - RED: focused adapter skill-install test failed because the packaged skill
+    lacked `## Session Resolution Contract`.
+  - GREEN: focused adapter skill-install test passed.
+  - Full adapter suite: `40 passed`.
+  - Adapter compileall: passed.
+  - Adapter import-boundary script: passed.
+  - Adapter contract-drift check against fresh Core OpenAPI fixture: passed.
+  - Adapter `git diff --check`: passed.
+- Replaced live Codex hooks with adapter capture-only hooks:
+  - backup: `/Users/openclaw/.codex/hooks.json.bak-mneme-phase11-pre-capture-only`;
+  - active file: `/Users/openclaw/.codex/hooks.json`;
+  - active hooks now contain only `codex-hook-capture` commands via
+    `python -m mneme_codex_adapter.cli`;
+  - active hooks contain no `codex-hook-ingest`,
+    `codex-hook-prepare-preview`, `/bin/mneme-codex-hook`, or
+    `mneme_service` entrypoints.
+- Live capture hook smoke passed with a temp JSONL file, and
+  `codex-hook-validate` reported `valid_for_enablement: true`.
+
+## 2026-06-27 - Adapter Commit Published
+
+- Committed the standalone adapter changes in
+  `/private/tmp/mneme-codex-adapter-phase11`.
+- Adapter commit:
+  `bd69b15e5716bb7731256aeba85ae45963be399a`
+  (`feat: enforce core adapter boundary`).
+- Pushed the adapter commit to
+  `https://github.com/johnnykor82/mneme-codex-adapter.git` `main`.
+- The local adapter `main` branch pointer was aligned to the pushed commit.

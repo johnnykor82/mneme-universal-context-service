@@ -1082,11 +1082,8 @@ def test_safe_docs_and_generated_templates_do_not_recommend_token_argv() -> None
     checked_paths = [
         Path("README.md"),
         Path("docs/INSTALLATION.md"),
-        Path("adapters/codex/MNEME_CODEX_MCP_USAGE.md"),
-        Path("adapters/codex/MNEME_CODEX_INGEST_USAGE.md"),
-        Path("adapters/codex/CODEX_DOGFOOD_RESTART_SETUP.md"),
-        Path("mneme_service/codex_setup.py"),
-        Path("mneme_service/codex_hooks.py"),
+        Path("docs/MNEME_HOST_ADAPTER_CONTRACT_V0.md"),
+        Path("mneme.example.toml"),
     ]
 
     combined = "\n".join(path.read_text(encoding="utf-8") for path in checked_paths)
