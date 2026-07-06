@@ -423,10 +423,17 @@ def test_event_ingest_indexes_redacted_content_and_compresses_tool_output_withou
     assert "middle middle" in fetched_text
     assert "sk-embedding-secret" not in fetched_text
     assert "[REDACTED]" in fetched_text
+    assert fetched.json()["data"]["event"]["ingestion"]["embedding_status"] == "INDEXED"
 
     cost = api.get("/v1/costs/session/session-emb", headers=auth_headers())
     assert cost.status_code == 200
     assert cost.json()["embedding_batches"] == 1
+    assert cost.json()["embedding_items"] == 2
+
+    metrics = api.get("/v1/metrics", headers=auth_headers())
+    assert metrics.status_code == 200
+    assert 'mneme_embedding_events_total{status="INDEXED"} 2' in metrics.text
+    assert 'mneme_embedding_events_total{status="PENDING"} 2' not in metrics.text
 
 
 def test_tool_output_embedding_compression_uses_settings_threshold(tmp_path: Path) -> None:
@@ -579,6 +586,7 @@ def test_event_ingest_stores_event_when_embedding_provider_fails(tmp_path: Path)
     )
     assert fetched.status_code == 200
     assert fetched.json()["data"]["event"]["event_id"] == "event-kept"
+    assert fetched.json()["data"]["event"]["ingestion"]["embedding_status"] == "FAILED"
 
     cost = api.get("/v1/costs/session/session-emb", headers=auth_headers())
     assert cost.status_code == 200

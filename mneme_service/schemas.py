@@ -552,6 +552,9 @@ class ProviderCapability(BaseModel):
     enabled: bool
     configured: bool
     available: bool
+    availability_basis: Literal["CONFIGURATION_AND_CREDENTIALS", "NOT_RUNTIME_AVAILABLE"]
+    live_status: str
+    live_health_checked: bool
     provider: str | None = None
     model: str | None = None
     base_url: str | None = None

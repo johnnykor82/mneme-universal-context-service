@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mneme-context-service"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local-first context memory service for tool-using agents"
 authors = [{ name = "Ivan Konstantinov" }]
 readme = "README.md"

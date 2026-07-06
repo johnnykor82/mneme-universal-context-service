@@ -569,6 +569,9 @@ def test_provider_summary_is_secret_safe() -> None:
         "enabled": True,
         "configured": True,
         "available": True,
+        "availability_basis": "CONFIGURATION_AND_CREDENTIALS",
+        "live_status": "UNKNOWN",
+        "live_health_checked": False,
         "provider": "openai_compatible",
         "model": "text-embedding-3-small",
         "base_url": "https://example.test/v1",
@@ -674,8 +677,15 @@ def test_capabilities_reflect_provider_configuration_without_leaking_secrets(tmp
     assert body["supports_llm_enrichment"] is True
     assert body["providers"]["embeddings"]["api_key_configured"] is True
     assert body["providers"]["embeddings"]["available"] is True
+    assert body["providers"]["embeddings"]["availability_basis"] == "CONFIGURATION_AND_CREDENTIALS"
+    assert body["providers"]["embeddings"]["live_status"] == "UNKNOWN"
+    assert body["providers"]["embeddings"]["live_health_checked"] is False
     assert body["providers"]["reranker"]["enabled"] is False
     assert body["providers"]["reranker"]["available"] is False
+    assert body["providers"]["reranker"]["availability_basis"] == "NOT_RUNTIME_AVAILABLE"
+    assert body["providers"]["llm_enrichment"]["available"] is True
+    assert body["providers"]["llm_enrichment"]["live_status"] == "UNKNOWN"
+    assert body["providers"]["llm_enrichment"]["live_health_checked"] is False
     assert "sk-embedding-secret" not in str(body)
     assert "sk-reranker-secret" not in str(body)
     assert "sk-llm-secret" not in str(body)

@@ -1796,6 +1796,7 @@ def create_app(
             "project_isolation_key": project_key,
             "session_id": session_id,
             "statuses": statuses,
+            "force": force,
             "status": status,
             "created_at": now,
             "started_at": None,

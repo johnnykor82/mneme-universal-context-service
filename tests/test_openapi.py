@@ -43,7 +43,7 @@ def test_capabilities_advertise_v0_foundation_without_overclaiming(tmp_path: Pat
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["service_version"] == "0.1.0"
+    assert body["service_version"] == "0.1.1"
     assert body["strict_cost_mode"] is False
     assert body["supports_openapi"] is True
     assert body["supports_metrics"] is True

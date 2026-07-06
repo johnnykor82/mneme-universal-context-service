@@ -309,3 +309,13 @@ def test_event_ingest_keeps_deterministic_state_when_llm_enrichment_fails(tmp_pa
     cost = api.get("/v1/costs/session/session-enrich", headers=auth_headers())
     assert cost.json()["enrichment_calls"] == 1
     assert cost.json()["failures"]["enrichment_failures"] == 1
+
+    capabilities = api.get("/v1/capabilities", headers=auth_headers())
+    assert capabilities.status_code == 200
+    provider = capabilities.json()["providers"]["llm_enrichment"]
+    assert capabilities.json()["supports_llm_enrichment"] is True
+    assert provider["available"] is True
+    assert provider["availability_basis"] == "CONFIGURATION_AND_CREDENTIALS"
+    assert provider["live_status"] == "DEGRADED"
+    assert provider["live_health_checked"] is True
+    assert provider["last_health"]["last_error_code"] == "LLM_ENRICHMENT_UNAVAILABLE"

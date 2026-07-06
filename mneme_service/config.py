@@ -68,15 +68,22 @@ class ProviderSettings:
         return injected_provider or not self.requires_api_key or bool(self.api_key)
 
     def summary(self, *, available: bool | None = None, health: ProviderHealth | None = None) -> dict[str, Any]:
+        runtime_available = self.runtime_available() if available is None else available
+        health_body = health.as_dict() if health is not None else "UNKNOWN"
+        live_status = health.status if health is not None else "UNKNOWN"
+        live_health_checked = bool(health is not None and health.checked_at_ms is not None)
         return {
             "enabled": self.enabled,
             "configured": self.configured,
-            "available": self.runtime_available() if available is None else available,
+            "available": runtime_available,
+            "availability_basis": "CONFIGURATION_AND_CREDENTIALS" if runtime_available else "NOT_RUNTIME_AVAILABLE",
+            "live_status": live_status,
+            "live_health_checked": live_health_checked,
             "provider": self.provider,
             "model": self.model,
             "base_url": self.base_url,
             "api_key_configured": bool(self.api_key),
-            "last_health": health.as_dict() if health is not None else "UNKNOWN",
+            "last_health": health_body,
         }
 
 

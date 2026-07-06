@@ -169,20 +169,25 @@ class EmbeddingIndex:
             try:
                 embeddings = self.provider.embed_texts(texts)
             except Exception:
+                self._mark_embedding_status(chunk, "FAILED", reason="PROVIDER_FAILURE")
                 stats = stats.plus(EmbeddingBatchStats(embedding_batches=1, embedding_failures=1))
                 continue
             if len(embeddings) != len(chunk):
+                self._mark_embedding_status(chunk, "FAILED", reason="PROVIDER_RESPONSE_MISMATCH")
                 stats = stats.plus(batch_stats.plus(EmbeddingBatchStats(embedding_failures=1)))
                 continue
             valid_embeddings = [embedding for embedding in embeddings if embedding]
             if valid_embeddings:
                 dimension = len(valid_embeddings[0])
                 if any(len(embedding) != dimension for embedding in valid_embeddings):
+                    self._mark_embedding_status(chunk, "FAILED", reason="PROVIDER_RESPONSE_MISMATCH")
                     stats = stats.plus(batch_stats.plus(EmbeddingBatchStats(embedding_failures=1)))
                     continue
             stored = 0
             for record, embedding in zip(chunk, embeddings):
                 if not embedding:
+                    if str(record.get("text", "")).strip():
+                        self._mark_embedding_status([record], "FAILED", reason="PROVIDER_EMPTY_EMBEDDING")
                     continue
                 try:
                     self.store.put_embedding(
@@ -194,8 +199,10 @@ class EmbeddingIndex:
                         token_count=int(record.get("token_count") or 0),
                         event_type=str(record.get("type") or ""),
                     )
+                    self._mark_embedding_status([record], "INDEXED")
                     stored += 1
                 except Exception:
+                    self._mark_embedding_status([record], "FAILED", reason="EMBEDDING_STORE_FAILURE")
                     stats = stats.plus(EmbeddingBatchStats(embedding_failures=1))
             failed_batch = 1 if any(text.strip() for text in texts) and stored == 0 else 0
             stats = stats.plus(
@@ -207,6 +214,25 @@ class EmbeddingIndex:
                 )
             )
         return stats
+
+    def _mark_embedding_status(
+        self,
+        records: Sequence[dict[str, Any]],
+        status: str,
+        *,
+        reason: str | None = None,
+    ) -> None:
+        for record in records:
+            event_id = record.get("event_id")
+            session_id = record.get("session_id")
+            if not event_id or not session_id:
+                continue
+            self.store.update_event_embedding_status(
+                session_id=str(session_id),
+                event_id=str(event_id),
+                status=status,
+                reason=reason,
+            )
 
     def search(self, query: str, *, session_id: str, top_k: int = 10) -> list[dict[str, Any]]:
         return self.search_with_status(query, session_id=session_id, top_k=top_k).results

@@ -130,6 +130,14 @@ Active Phase: none
 - Effort: 3-6 focused implementation cycles after Planning Gate approval, plus adapter checkout/repository coordination
 - Plan: `.planning/work/11-core-adapter-boundary-and-codex-adapter-sync/plan.md`
 
+### 12-provider-status-and-install-hardening
+- Status: complete
+- Goal: Fix post-install provider/status defects from the 2026-07-06 diagnostic while preserving the approved Core/Adapter boundary.
+- Spec coverage: Sections 10, 12, 14.1, 14.8, 15, 19 plus Phase 11 extension R-003/R-004.
+- Matrix rows: post-v0 hardening; must preserve final v0 compliance and published adapter compatibility.
+- Effort: 1 focused implementation cycle.
+- Plan: `.planning/work/12-provider-status-and-install-hardening/plan.md`
+
 ## Transition Criteria
 
 | Transition | Criteria |
@@ -148,6 +156,7 @@ Active Phase: none
 | v0 acceptance -> Phase 11 planning | Core/Adapter Boundary Refactor spec approved for planning |
 | Phase 11 planning -> Phase 11 execution | User explicitly approves the Phase 11 plan and clears the Extension Planning Gate |
 | Phase 11 -> post-refactor acceptance | Core boundary checks, adapter tests, cross-repository CI, runtime smoke, and reviewer packet evidence all pass |
+| Phase 12 -> release update | Provider/status focused tests, full Core and adapter verification, docs/install diagnostics, and runtime smoke pass |
 
 ## Verification Gates
 
@@ -182,12 +191,12 @@ The roadmap is not complete until all of these are true:
 
 | Metric | Value |
 |---|---|
-| Total phases | 11 |
-| Complete | 11 |
+| Total phases | 12 |
+| Complete | 12 |
 | In progress | 0 |
 | Pending | 0 |
 | Cancelled | 0 |
-| Last updated | 2026-06-27 |
+| Last updated | 2026-07-06 |
 
 ## Decisions Made
 

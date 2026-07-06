@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-PACKAGE_VERSION = "0.1.0"
+PACKAGE_VERSION = "0.1.1"
 _FALLBACK_CONTRACT_VERSION = "0.7.5"
 _SEMVER_LINE = re.compile(r"\d+\.\d+\.\d+\n?")
 

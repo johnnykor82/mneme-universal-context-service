@@ -2153,7 +2153,7 @@ class Store:
             }
             for name, row in provider_rows.items()
         }
-        embedding_statuses = {"PENDING": 0, "FAILED": 0}
+        embedding_statuses = {"INDEXED": 0, "PENDING": 0, "FAILED": 0}
         compression_by_type: dict[str, int] = {}
         for row in event_rows:
             try:
@@ -2161,8 +2161,12 @@ class Store:
             except (TypeError, json.JSONDecodeError):
                 continue
             metadata = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
-            status = str(metadata.get("embedding_status") or "").upper()
-            if status in embedding_statuses:
+            ingestion = event.get("ingestion") if isinstance(event.get("ingestion"), dict) else {}
+            event_id = str(event.get("event_id") or "")
+            status = str(ingestion.get("embedding_status") or metadata.get("embedding_status") or "").upper()
+            if embedding_model_id and event_id in embedded_event_ids:
+                embedding_statuses["INDEXED"] += 1
+            elif status in embedding_statuses:
                 embedding_statuses[status] += 1
             elif embedding_model_id and event.get("event_id") not in embedded_event_ids:
                 embedding_statuses["PENDING"] += 1

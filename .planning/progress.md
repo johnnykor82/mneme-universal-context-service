@@ -2893,3 +2893,46 @@
 - Pushed the adapter commit to
   `https://github.com/johnnykor82/mneme-codex-adapter.git` `main`.
 - The local adapter `main` branch pointer was aligned to the pushed commit.
+## 2026-07-06 - Phase 12 Provider Status And Install Hardening Started
+
+- Reviewed `/private/tmp/mneme-full-diagnostic-report.md` and the install
+  handoff attachment.
+- Confirmed current Core behavior: Mneme does not and should not use the
+  current Codex/host agent model for LLM enrichment. Core only uses explicitly
+  configured provider endpoints.
+- Added Phase 12 hotfix plan:
+  `.planning/work/12-provider-status-and-install-hardening/plan.md`.
+- Updated roadmap active phase to
+  `12-provider-status-and-install-hardening`.
+- Scope approved by user: apply embedding status/accounting, provider health,
+  adapter hook normalization/timeout, docs/install diagnostics, tests, and
+  GitHub release updates; do not add host-agent LLM fallback.
+
+## 2026-07-06 - Phase 12 Provider Status And Install Hardening Complete
+
+- Core fixes:
+  - successful embedding writes now mark events `ingestion.embedding_status:
+    INDEXED`;
+  - provider/batch failures mark events `FAILED`;
+  - metrics count `INDEXED` from active embedding rows and read status from
+    `ingestion`;
+  - forced reindex jobs now persist `force=true` so draining matches
+    candidate-count planning;
+  - provider capability summaries now expose `availability_basis`,
+    `live_status`, and `live_health_checked`;
+  - Core package version bumped to `0.1.1`.
+- Adapter fixes in `/private/tmp/mneme-codex-adapter-phase12`:
+  - `UserPromptSubmit` normalizes to canonical `USER_MESSAGE`/`USER`;
+  - other Codex hooks remain `CODEX_HOOK`;
+  - hook network timeout defaults increased to 300 seconds;
+  - adapter package version bumped to `0.1.6`.
+- Docs updated for minimal vs full semantic mode, provider live-status meaning,
+  hook timeout, and `UserPromptSubmit` canonical event behavior.
+- Verification:
+  - Core focused touched-area gate: `17 passed, 53 deselected, 1 warning`;
+  - Core full suite: `307 passed, 1 warning`;
+  - Core compileall: passed;
+  - Core `git diff --check`: passed;
+  - Adapter full suite: `42 passed`;
+  - Adapter compileall: passed;
+  - Adapter `git diff --check`: passed.

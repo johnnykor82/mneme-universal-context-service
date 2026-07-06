@@ -140,7 +140,17 @@ environment variables. See [PROVIDER_CONFIGURATION.md](PROVIDER_CONFIGURATION.md
 For dogfood or public-readiness semantic memory, enable embeddings and start the
 daemon with `require_embeddings = true` or `--require-embeddings`. This fails
 fast when embeddings are missing instead of silently running keyword-only
-memory.
+memory. For the full semantic setup, also configure and smoke-test reranking
+and LLM enrichment. A healthy daemon and visible MCP tools prove the minimal
+memory path; they do not prove all provider layers are active.
+
+After provider setup, verify a real event:
+
+- `fetch_event` reports `ingestion.embedding_status: INDEXED`;
+- the session cost report has `embedding_items > 0` and no embedding failures;
+- semantic search shows reranked results when a reranker is configured;
+- LLM enrichment increments `enrichment_calls` and leaves
+  `enrichment_failures == 0` when live enrichment readiness is claimed.
 
 ## Public Release Status
 

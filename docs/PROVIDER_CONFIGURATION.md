@@ -37,6 +37,19 @@ Minimal mode is not the dogfood/public-readiness mode. Real semantic memory
 requires embeddings because semantic search, topic centroids, and drift
 detection depend on stored vectors. In short: semantic memory requires embeddings.
 
+## Full Semantic Mode
+
+For the expected Codex-memory experience, configure and verify all three quality
+layers:
+
+1. embeddings for semantic search and drift signals;
+2. reranker for final retrieval ordering;
+3. LLM enrichment for structured execution-state enrichment.
+
+The daemon can run without any of these layers, but that is fallback/minimal
+mode. Do not treat a healthy daemon or visible MCP tools as proof that full
+semantic memory is active.
+
 ## Required Embeddings Mode
 
 For dogfood or production-like usage, require embeddings so the daemon fails
@@ -63,7 +76,17 @@ mneme serve --require-embeddings --embeddings-enabled ...
 `GET /v1/capabilities` should report both `supports_embeddings: true` and
 `requires_embeddings: true` for this mode. Before publication or adapter
 rehearsal, ingest a real event and verify `embedding_items > 0` and
-`embedding_failures == 0` in the session cost report.
+`embedding_failures == 0` in the session cost report. `fetch_event` should show
+`ingestion.embedding_status: INDEXED` for newly indexed events.
+
+Provider capability fields separate configuration from observed runtime health:
+
+- `available` means the provider is enabled, configured, and has required
+  credentials.
+- `availability_basis` explains that this is configuration/credential based.
+- `live_status` and `live_health_checked` report process-local observed
+  provider outcomes. `UNKNOWN` means no provider call has been observed in the
+  current daemon process.
 
 ## Embeddings
 
@@ -151,9 +174,14 @@ daemon can enrich structured execution state; it is not a separate natural-langu
 publish an answer-synthesis claim unless that path is implemented and verified
 with a real provider.
 
-The current local dogfood daemon has embeddings and reranker configured, but no
-LLM enrichment provider enabled. Keep LLM real-provider smoke as a publication
-gate only when the release claims live LLM enrichment readiness.
+Mneme Core does not use the current host agent's model as an implicit fallback.
+If LLM enrichment is enabled, Core uses only the explicitly configured
+OpenAI-compatible provider endpoint. If that endpoint times out or fails,
+ingestion continues with deterministic state and provider health is marked
+degraded after the observed failure.
+
+Keep LLM real-provider smoke as a publication gate whenever release notes claim
+live LLM enrichment readiness.
 
 ## Privacy
 
