@@ -1455,6 +1455,112 @@ def test_resolve_session_best_guess_prefers_exact_project_path_before_recency(tm
     assert "list_sessions" in body["warnings"][0]["message"]
 
 
+def test_resolve_session_thread_anchor_ignores_unmatched_semantic_query(tmp_path: Path) -> None:
+    api = client(tmp_path)
+    project_path = "/repo/hermes-plugins"
+    thread_id = "019ed9cf-12b6-7281-9085-5652bace533e"
+    start_session(
+        api,
+        session_id=thread_id,
+        runtime="CODEX",
+        project_id=project_path,
+        metadata={
+            "cwd": project_path,
+            "source": "codex_hook",
+            "transcript_path": f"/Users/me/.codex/sessions/rollout-{thread_id}.jsonl",
+        },
+    )
+
+    resolved = api.post(
+        "/v1/tools/resolve_session",
+        headers=auth_headers(),
+        json={
+            "project_path": project_path,
+            "thread_id": thread_id,
+            "query": "NousResearch hermes-agent PR 41918 51226 on_turn_complete latest comments",
+            "limit": 3,
+        },
+    )
+
+    assert resolved.status_code == 200, resolved.text
+    body = resolved.json()
+    assert body["data"]["resolved_session_id"] == thread_id
+    assert body["data"]["resolution"] == "EXACT_THREAD_ID"
+    assert body["session_resolution"]["session_id"] == thread_id
+    assert body["warnings"] == []
+
+
+def test_resolve_session_exact_project_match_is_ranked_before_pagination(tmp_path: Path) -> None:
+    api = client(tmp_path)
+    project_path = "/repo/plugins"
+    exact_session_id = "session-exact-project-old"
+    start_session(
+        api,
+        session_id=exact_session_id,
+        runtime="CODEX",
+        project_id=project_path,
+        metadata={"cwd": project_path, "thread_id": "thread-exact"},
+    )
+    for index in range(4):
+        start_session(
+            api,
+            session_id=f"session-new-subproject-{index}",
+            runtime="CODEX",
+            project_id=f"{project_path}/_mneme",
+            metadata={"cwd": f"{project_path}/_mneme", "thread_id": f"thread-sub-{index}"},
+        )
+        time.sleep(0.002)
+
+    resolved = api.post(
+        "/v1/tools/resolve_session",
+        headers=auth_headers(),
+        json={"project_path": project_path, "limit": 3},
+    )
+
+    assert resolved.status_code == 200, resolved.text
+    body = resolved.json()
+    assert body["data"]["resolution"] == "AMBIGUOUS"
+    assert body["data"]["best_guess_session_id"] == exact_session_id
+    assert body["data"]["matches"][0]["session_id"] == exact_session_id
+    assert body["data"]["matches_truncated"] is True
+
+
+def test_resolve_session_project_anchor_falls_back_when_query_matches_no_metadata(tmp_path: Path) -> None:
+    api = client(tmp_path)
+    project_path = "/repo/plugins"
+    exact_session_id = "session-exact-project-old"
+    start_session(
+        api,
+        session_id=exact_session_id,
+        runtime="CODEX",
+        project_id=project_path,
+        metadata={"cwd": project_path, "source": "codex_hook"},
+    )
+    start_session(
+        api,
+        session_id="session-new-subproject",
+        runtime="CODEX",
+        project_id=f"{project_path}/_mneme",
+        metadata={"cwd": f"{project_path}/_mneme", "source": "codex_hook"},
+    )
+
+    resolved = api.post(
+        "/v1/tools/resolve_session",
+        headers=auth_headers(),
+        json={
+            "project_path": project_path,
+            "query": "NousResearch hermes-agent PR 41918 51226 on_turn_complete latest comments",
+            "limit": 3,
+        },
+    )
+
+    assert resolved.status_code == 200, resolved.text
+    body = resolved.json()
+    assert body["data"]["resolution"] == "AMBIGUOUS"
+    assert body["data"]["best_guess_session_id"] == exact_session_id
+    assert body["data"]["matches"][0]["session_id"] == exact_session_id
+
+
 def test_resolve_session_best_guess_is_null_for_recency_only_ambiguity(tmp_path: Path) -> None:
     api = client(tmp_path)
     start_session(

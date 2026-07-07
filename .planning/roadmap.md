@@ -138,6 +138,14 @@ Active Phase: none
 - Effort: 1 focused implementation cycle.
 - Plan: `.planning/work/12-provider-status-and-install-hardening/plan.md`
 
+### 13-session-resolution-dogfood-ux
+- Status: complete
+- Goal: Improve dogfood session discovery so Codex agents can safely find the current Mneme session using exact thread/session anchors and usable fallback instructions.
+- Spec coverage: Section 15 MCP session-resolution UX plus Phase 11 adapter skill contract.
+- Matrix rows: post-v0 hardening; must preserve final v0 compliance and published adapter compatibility.
+- Effort: 1 focused implementation cycle.
+- Plan: `.planning/work/13-session-resolution-dogfood-ux/plan.md`
+
 ## Transition Criteria
 
 | Transition | Criteria |
@@ -157,6 +165,7 @@ Active Phase: none
 | Phase 11 planning -> Phase 11 execution | User explicitly approves the Phase 11 plan and clears the Extension Planning Gate |
 | Phase 11 -> post-refactor acceptance | Core boundary checks, adapter tests, cross-repository CI, runtime smoke, and reviewer packet evidence all pass |
 | Phase 12 -> release update | Provider/status focused tests, full Core and adapter verification, docs/install diagnostics, and runtime smoke pass |
+| Phase 13 -> dogfood session-resolution acceptance | Core session-resolution tests, adapter skill-install tests, live REST/MCP smoke, and diff hygiene pass |
 
 ## Verification Gates
 
@@ -196,7 +205,7 @@ The roadmap is not complete until all of these are true:
 | In progress | 0 |
 | Pending | 0 |
 | Cancelled | 0 |
-| Last updated | 2026-07-06 |
+| Last updated | 2026-07-07 |
 
 ## Decisions Made
 

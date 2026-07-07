@@ -2936,3 +2936,65 @@
   - Adapter full suite: `42 passed`;
   - Adapter compileall: passed;
   - Adapter `git diff --check`: passed.
+
+## 2026-07-07 - Phase 13 Session Resolution Dogfood UX Started
+
+- Diagnosed why another Codex thread reported that the current Mneme session
+  was not found.
+- External thread diagnostic confirmed:
+  - only `resolve_session` was callable/used there;
+  - `list_sessions` was not exposed as a callable tool;
+  - no exact Mneme `session_id` or Codex `thread_id` anchor was available to
+    the agent;
+  - the agent used `project_path=/Users/openclaw/.hermes/plugins` and a
+    semantic GitHub PR query.
+- Local REST evidence showed the session
+  `019ed9cf-12b6-7281-9085-5652bace533e` exists, but
+  `resolve_session(thread_id=..., query=...)` returned `NOT_FOUND` while
+  `resolve_session(thread_id=...)` resolved correctly.
+- Added Phase 13 plan:
+  `.planning/work/13-session-resolution-dogfood-ux/plan.md`.
+- Scope: fix exact thread/session anchor resolution, discovery ranking before
+  pagination, and adapter skill fallback guidance.
+
+## 2026-07-07 - Phase 13 Session Resolution Dogfood UX Complete
+
+- Added RED/GREEN Core tests for:
+  - exact Codex `thread_id` plus semantic query resolving instead of returning
+    `NOT_FOUND`;
+  - exact project matches being ranked before pagination over newer subproject
+    sessions;
+  - project-path fallback when semantic query does not match session metadata.
+- Fixed Core session discovery:
+  - `thread_id` equal to a session id resolves as `EXACT_THREAD_ID`;
+  - `thread_id` also matches transcript path substrings;
+  - discovery is relevance-sorted before pagination;
+  - `resolve_session(project_path + query)` falls back to project discovery
+    instead of returning false `NOT_FOUND` when the query misses metadata.
+- Updated adapter-packaged `mneme-memory` skill copies so agents pass Codex
+  thread ids as `thread_id` and use `tool_search` for `mneme list_sessions`
+  if `list_sessions` is mentioned but not callable.
+- Bumped package versions:
+  - Core `0.1.2`;
+  - adapter `0.1.7`.
+- Verification:
+  - Core focused resolver/openapi/MCP gate: `7 passed, 78 deselected, 1 warning`;
+  - Core full suite: `310 passed, 1 warning`;
+  - Core compileall: passed;
+  - Core `git diff --check`: passed;
+  - Adapter skill focused test: passed;
+  - Adapter full suite: `42 passed`;
+  - Adapter compileall: passed;
+  - Adapter `git diff --check`: passed.
+- Installed local runtime from working trees and restarted Mneme:
+  - `/Users/openclaw/.mneme-codex` now imports Core `0.1.2` and adapter
+    `0.1.7`;
+  - `com.mneme.codex` is running and `/v1/health` is OK;
+  - shared skill `/Users/openclaw/CodexShared/skills/mneme-memory/SKILL.md`
+    includes the new `tool_search` / `mneme list_sessions` fallback guidance.
+- Live REST smoke:
+  - `resolve_session(project_path=/Users/openclaw/.hermes/plugins, query=...)`
+    returns `AMBIGUOUS` with the correct PR thread as the first match instead
+    of `NOT_FOUND`;
+  - `resolve_session(..., thread_id=019ed9cf-12b6-7281-9085-5652bace533e,
+    query=...)` resolves exactly with `resolution=EXACT_THREAD_ID`.

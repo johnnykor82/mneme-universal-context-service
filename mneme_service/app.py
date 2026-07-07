@@ -3117,15 +3117,21 @@ def create_app(
 
         project_keys = visible_project_keys(principal)
         exact = None
+        exact_resolution = "EXACT_SESSION_ID"
         if session_id and store.has_session(session_id):
             session_project = store.session_project_key(session_id)
             if principal.can_access_project(session_project):
                 exact = store.get_session_summary(session_id)
+        if exact is None and thread_id and store.has_session(thread_id):
+            session_project = store.session_project_key(thread_id)
+            if principal.can_access_project(session_project):
+                exact = store.get_session_summary(thread_id)
+                exact_resolution = "EXACT_THREAD_ID"
         if exact:
             return tool_response(
                 {
                     "resolved_session_id": exact["session_id"],
-                    "resolution": "EXACT_SESSION_ID",
+                    "resolution": exact_resolution,
                     "matches": [exact],
                     "next_page_token": None,
                     "matches_truncated": False,
@@ -3133,7 +3139,7 @@ def create_app(
                 session_resolution=session_resolution(exact["session_id"], "RESOLVED_BY_TOOL"),
             )
 
-        search_query = query or session_id
+        search_query = None if thread_id else (query or session_id)
         page = store.list_sessions_page(
             query=search_query,
             project_path=project_path,
@@ -3143,6 +3149,21 @@ def create_app(
             page_size=page_size,
             page_token=page_token,
         )
+        if (
+            not page["sessions"]
+            and search_query
+            and any([project_path, thread_id, slug])
+            and page_token is None
+        ):
+            page = store.list_sessions_page(
+                query=None,
+                project_path=project_path,
+                thread_id=thread_id,
+                slug=slug,
+                project_isolation_keys=project_keys,
+                page_size=page_size,
+                page_token=page_token,
+            )
         matches = sorted_resolution_matches(
             page["sessions"],
             project_path=project_path,

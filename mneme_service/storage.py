@@ -177,7 +177,7 @@ def session_matches(
     if not any([query, project_path, thread_id, slug]):
         return True
     fields = session_discovery_fields(session)
-    if thread_id and normalize_match_value(thread_id) not in {normalize_match_value(value) for value in fields["thread_ids"]}:
+    if thread_id and not any(matches_text(value, thread_id) for value in fields["thread_ids"]):
         return False
     if project_path and not any(matches_text(value, project_path) for value in fields["project_paths"]):
         return False
@@ -202,7 +202,7 @@ def session_discovery_fields(session: dict[str, Any]) -> dict[str, list[str]]:
         for key in SESSION_DISCOVERY_METADATA_KEYS
     ]
     project_paths = [session.get("project_id"), metadata.get("cwd"), metadata.get("transcript_path")]
-    thread_ids = [session.get("session_id"), metadata.get("thread_id")]
+    thread_ids = [session.get("session_id"), metadata.get("thread_id"), metadata.get("transcript_path")]
     return {
         "all": [str(value) for value in [*base_fields, *metadata_fields] if isinstance(value, str) and value],
         "project_paths": [str(value) for value in project_paths if isinstance(value, str) and value],
@@ -230,6 +230,53 @@ def matches_slug(value: str, slug: str) -> bool:
 
 def normalize_match_value(value: str) -> str:
     return value.strip().lower()
+
+
+def timestamp_sort_value(value: str | None) -> float:
+    if not value:
+        return 0.0
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def session_discovery_sort_key(
+    summary: dict[str, Any],
+    *,
+    query: str | None,
+    project_path: str | None,
+    thread_id: str | None,
+    slug: str | None,
+) -> tuple[int, int, int, int, float, int, str]:
+    fields = session_discovery_fields(summary)
+    normalized_thread = normalize_match_value(thread_id or "")
+    normalized_project = normalize_match_value(project_path or "")
+    exact_thread = int(
+        bool(normalized_thread)
+        and any(normalized_thread == normalize_match_value(value) for value in fields["thread_ids"])
+    )
+    thread_in_transcript = int(
+        bool(normalized_thread)
+        and any(normalized_thread in normalize_match_value(value) for value in fields["thread_ids"])
+    )
+    exact_project_path = int(
+        bool(normalized_project)
+        and any(normalized_project == normalize_match_value(value) for value in fields["project_paths"])
+    )
+    slug_match = int(bool(slug) and any(matches_slug(value, slug) for value in fields["all"]))
+    query_match = int(bool(query) and any(matches_text(value, query) for value in fields["all"]))
+    latest = timestamp_sort_value(str(summary.get("latest_event_timestamp") or summary.get("started_at") or ""))
+    created_at_ms = int(summary.get("created_at_ms") or 0)
+    return (
+        exact_thread,
+        thread_in_transcript,
+        exact_project_path,
+        slug_match or query_match,
+        latest,
+        created_at_ms,
+        str(summary.get("session_id") or ""),
+    )
 
 
 class Store:
@@ -1313,10 +1360,7 @@ class Store:
             ).fetchall()
         summaries: list[dict[str, Any]] = []
         allowed_projects = set(project_isolation_keys) if project_isolation_keys is not None else None
-        sorted_rows = sorted(
-            rows,
-            key=lambda row: (-int(row["created_at_ms"]), str(json.loads(row["data"]).get("session_id") or "")),
-        )
+        sorted_rows = sorted(rows, key=lambda row: (-int(row["created_at_ms"]), str(json.loads(row["data"]).get("session_id") or "")))
         for row in sorted_rows:
             session = json.loads(row["data"])
             project_key = session_project_key(session)
@@ -1331,6 +1375,16 @@ class Store:
             ):
                 continue
             summaries.append(self.session_summary(session, int(row["created_at_ms"])))
+        summaries.sort(
+            key=lambda summary: session_discovery_sort_key(
+                summary,
+                query=query,
+                project_path=project_path,
+                thread_id=thread_id,
+                slug=slug,
+            ),
+            reverse=True,
+        )
         offset = int(page_token or 0)
         end = offset + int(page_size)
         page = summaries[offset:end]
