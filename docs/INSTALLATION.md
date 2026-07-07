@@ -111,6 +111,22 @@ mneme mcp --base-url http://127.0.0.1:8765
 The MCP server is a proxy over the REST memory tools. It does not replace the
 host runtime's prompt by itself.
 
+## Host Adapter Troubleshooting
+
+Host runtimes may apply their own permission review before an MCP tool call
+reaches Mneme. For example, a Codex host error such as `The automatic
+permission approval review did not finish before its deadline` is evidence of a
+host permission-gating timeout, not by itself evidence of a Mneme REST daemon,
+MCP server, provider, or memory-data failure. Retry once, prefer exact session
+or thread anchors when the host adapter provides them, and check REST health,
+daemon logs, or the adapter's doctor command before reporting Mneme as
+unavailable.
+
+Sandboxed commands may also block localhost access to `127.0.0.1`. A sandboxed
+health or doctor command that fails with `Operation not permitted` is not
+conclusive. Rerun the host-adapter diagnostic with explicit approval or outside
+the sandbox, then compare it with Mneme daemon logs and direct REST responses.
+
 ## Run The Local Benchmark
 
 ```bash
